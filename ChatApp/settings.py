@@ -6,20 +6,21 @@ SECRET_KEY = 'django-insecure-j&j2$ky(ed@90a+f_4w&n*9ec8blo3j^8f9=kl*4q7_6&6@g5*
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1" ,"192.168.43.28" , "localhost"]
+ALLOWED_HOSTS = ["127.0.0.1", "192.168.43.28", "localhost"]
 
 INSTALLED_APPS = [
+    'daphne',
     'chat.apps.ChatConfig',
-    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # add django channels
-    'channels' , 
+    'channels',
+    'sslserver',
 ]
 ASGI_APPLICATION = 'ChatApp.asgi.application'
 
@@ -98,6 +99,6 @@ CHANNEL_LAYERS = {
     }
 }
 
-LOGIN_REDIRECT_URL = "chat-page"
+LOGIN_REDIRECT_URL = "home"
 
 LOGOUT_REDIRECT_URL = "login-user"
