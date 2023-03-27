@@ -20,6 +20,7 @@ INSTALLED_APPS = [
 
     # add django channels
     'channels',
+    'django_cron',
     'sslserver',
 ]
 ASGI_APPLICATION = 'ChatApp.asgi.application'
@@ -77,6 +78,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+CRON_CLASSES = [
+    'ChatApp.cron.KickOutInactivePlayersCronJob',
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
