@@ -1,20 +1,12 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Chat Rooms</title>
+    <title>Home </title>
   </head>
   <body>
-    <h1>Join or create room</h1>
-    {% if error %}
-    <p>{{ error }}</p>
-    {% endif %}
-    <form method="post">
-      {% csrf_token %}
-      <label for="roomkey">Room Key:</label>
-      <input type="text" name="roomkey" id="roomkey" /><br />
-      <label><input type="radio" name="action" value="create">Create Room</label><br>
-      <label><input type="radio" name="action" value="join">Join Room</label><br>
-      <button type="submit">Create/Join Room</button>
-    </form>
+    <h1>Home</h1>
+    <a href="/createJoin">Create or Join Room</a>
+    <!-- logout -->
+    <a href="/auth/logout">Logout</a>
   </body>
 </html>

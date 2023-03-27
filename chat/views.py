@@ -6,8 +6,10 @@ from .models import User, GameRoom, GameRoomManager
 
 
 def createRoom(request):
-    room = GameRoom.objects.create_room(request.user.username)
-
+    room = GameRoom.game_manager.create_room(request.user)
+    if room is None:
+        return render(request, 'chat/createJoinRoom.html', {'error': 'Room could not be created'})
+    GameRoom.game_manager.join_room(room.room_id, request.user)
     return redirect(f'/chat/{room.room_id}')
 
 
@@ -15,14 +17,21 @@ def joinRoom(request):
     roomkey = request.POST.get('roomkey')
     user = request.user
     try:
-        room = GameRoom.objects.join_room(roomkey, user.id)
+        room = GameRoom.game_manager.join_room(roomkey, user)
+        if room is None:
+            raise ValidationError('Room does not exist or is full')
     except ValidationError as e:
-        return render(request, 'chat/home.html', {'error': e})
+        return render(request, 'chat/createJoinRoom.html', {'error': e})
 
     room.save()
 
     return redirect('/chat/' + roomkey)
 
+
+def home(request):
+    if not request.user.is_authenticated:
+        return redirect("login-user")
+    return render(request, 'chat/home.html',{})
 
 def chatPage(request, *args, **kwargs):
     if not request.user.is_authenticated:
@@ -35,9 +44,9 @@ def chatPage(request, *args, **kwargs):
         elif (action == 'join'):
             return joinRoom(request)
         else:
-            return render(request, 'chat/home.html', {'error': 'Invalid action. select create or join'})
+            return render(request, 'chat/createJoinRoom.html', {'error': 'Invalid action. select create or join'})
     else:
-        return render(request, 'chat/home.html')
+        return render(request, 'chat/createJoinRoom.html')
 
 
 def room(request, room_name):

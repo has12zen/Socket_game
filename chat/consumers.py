@@ -1,7 +1,8 @@
+from django.core.signals import request_started
 import json
-
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
+from .models import GameRoom
 
 
 class ChatConsumer(WebsocketConsumer):
@@ -19,6 +20,8 @@ class ChatConsumer(WebsocketConsumer):
         async_to_sync(self.channel_layer.group_discard)(
             self.room_group_name, self.channel_name
         )
+        print("disconnecting",  self.room_name,self.scope["user"].username)
+        GameRoom.game_manager.leave_room(self.room_name, self.scope["user"].username)
 
     # Receive message from WebSocket
     def receive(self, text_data):

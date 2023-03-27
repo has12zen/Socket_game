@@ -7,4 +7,4 @@ class KickOutInactivePlayersCronJob(CronJobBase):
     code = 'chat.kick_out_inactive_players_cron_job'
 
     def do(self):
-        GameRoom.objects.kick_out_inactive_players()
+        GameRoom.game_manager.kick_out_inactive_players()
