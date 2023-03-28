@@ -33,6 +33,13 @@ class GameRoomManager(models.Manager):
         room = self.model(status='ACCEPTING')
         room.save()
         return room
+    
+    def get_room(self, room_id):
+        try:
+            room = GameRoom.objects.get(room_id=room_id)
+            return room
+        except:
+            return None
 
     def join_room(self, room_id, creator):
         try:

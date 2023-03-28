@@ -7,13 +7,23 @@ from .models import GameRoom
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
+        if not self.scope["user"].is_authenticated:
+            self.close()
+            return;
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room_group_name = "chat_%s" % self.room_name
-        async_to_sync(self.channel_layer.group_add)(
-            self.room_group_name, self.channel_name
-        )
+        try:
+            room = GameRoom.game_manager.join_room(self.room_name, self.scope["user"])
+            if room is None:
+                raise Exception("Something went wrong")
+            async_to_sync(self.channel_layer.group_add)(
+                self.room_group_name, self.channel_name
+            )
+            self.accept()
+        except Exception as e:
+            print(e)
+            self.close()
 
-        self.accept()
 
     def disconnect(self, close_code):
         # Leave room group

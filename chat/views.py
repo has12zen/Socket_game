@@ -15,15 +15,13 @@ def createRoom(request):
 
 def joinRoom(request):
     roomkey = request.POST.get('roomkey')
-    user = request.user
     try:
-        room = GameRoom.game_manager.join_room(roomkey, user)
+        room = GameRoom.game_manager.get_room(roomkey)
         if room is None:
             raise ValidationError('Room does not exist or is full')
     except ValidationError as e:
         return render(request, 'chat/createJoinRoom.html', {'error': e})
 
-    room.save()
 
     return redirect('/chat/' + roomkey)
 
