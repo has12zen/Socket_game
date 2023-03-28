@@ -6,6 +6,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import datetime, timedelta
 import secrets
+from picklefield.fields import PickledObjectField
 import random
 from itertools import product
 
@@ -30,8 +31,7 @@ def generate_room_id():
 
 class GameRoomManager(models.Manager):
     def create_room(self, creator):
-        room = self.model(status='ACCEPTING')
-        room.save()
+        room = GameRoom.objects.create(status='ACCEPTING')
         return room
     
     def get_room(self, room_id):
@@ -41,7 +41,7 @@ class GameRoomManager(models.Manager):
         except:
             return None
 
-    def join_room(self, room_id, creator):
+    def join_room(self, room_id, creator,channel_name):
         try:
             room = GameRoom.objects.get(room_id=room_id)
             user_instance = User.objects.get(username=creator.username)
@@ -51,15 +51,24 @@ class GameRoomManager(models.Manager):
                 if player.username == creator.username:
                     player = Player.objects.get(user=user_instance, game_room=room)
                     player.leave_time = None
-                    player.save();
+                    player.channel_name = channel_name
+                    player.save()
+                    room.increment_playercount();
+                    room.save()
+                    # user is was disconnected
                     return room
 
             if room.players.count() >= 4:
                 print("Room is full 444",room.players)
                 return None
             player = Player.objects.create(user=user_instance, game_room=room)
+            player.channel_name=channel_name;
+            player.save();
             room.players.add(player.user)
+            room.increment_playercount();
             room.save()
+            if(room.players.count() == 4):
+                print("start game")
             return room
         except Exception as e: 
             print(e,"something went wrong")
@@ -72,9 +81,11 @@ class GameRoomManager(models.Manager):
             if player.username == name:
                 pl = Player.objects.get(user=user_instance, game_room=room)
                 pl.leave_time = datetime.now()
+                room.decrement_playercount();
                 pl.save()
                 print('Player left room', pl.leave_time)
                 break;
+        room.save()
         return room
 
     def make_move(self, room_id, player_id, move):
@@ -112,19 +123,32 @@ class GameRoomManager(models.Manager):
                             room.winnerList = room.winnerList + str(room.player_four) + ','
                 room.save()
 
-    def shuffle_cards(self):
-        suits = ['hearts', 'diamonds', 'clubs', 'spades']
-        ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace']
-        deck = list(product(suits, ranks))
-        random.shuffle(deck)
-        return deck
+    def getPlayer(self,user_id,room_id):
+        player = Player.objects.get(user_id=user_id,game_room_id=room_id)
+        return player
+        
+    def send_message_to_room(self,room_name,message):
+        room = self.get(room_id=room_name)
+        async_to_sync(channel_layer.group_send)(
+            room.get_group_name(), {"type": "chat_message", "message": message}
+        )
+    
+    def send_message_to_player(self,room_name,username,message):
+        room = self.get(room_id=room_name)
+        user = User.objects.get(username=username)
+        player = self.getPlayer(user.id,room.id)
+        async_to_sync(channel_layer.send)(
+            player.channel_name, {"type": "chat_message", "message": message}
+        )        
     
     def receive_message(self,room_id,username,message,channel_name):
-        room_group_name = f"chat_{room_id}"
-        print(f"{room_id}, {username}, {message}, {channel_name}")
-        async_to_sync(channel_layer.send)(
-            channel_name, {"type": "chat_message", "message": message}
-        )
+        room = self.get(room_id=room_id)
+        user = User.objects.get(username=username)
+        player = self.getPlayer(user.id,room.id)
+        # handle logic
+        self.send_message_to_player(room_id,username,message)
+        self.send_message_to_room(room_id,message)
+
 
 
 class GameRoom(models.Model):
@@ -144,35 +168,28 @@ class GameRoom(models.Model):
     looserList = models.TextField(null=True, blank=True)
     cards = models.JSONField(null=True, blank=True)
     cards_distributed = models.BooleanField(default=False)
+    playercount = models.IntegerField(default=0)
+    game_state = PickledObjectField(default=None, null=True)
     # Manager
     objects = models.Manager()
     game_manager = GameRoomManager()
+
+    def get_group_name(self):
+        return f"chat_{self.room_id}"
+
+    def increment_playercount(self):
+        if self.playercount<4:
+            self.playercount += 1
+        if self.playercount==4:
+            print("Game can continue....");
+        print("adding players",self.playercount)
+
+    def decrement_playercount(self):
+        if self.playercount>0:
+            self.playercount -= 1
+        if self.playercount!=4:
+            print("Waiting for 4 players to join")
     
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            game_manager = GameRoomManager()
-            self.cards = game_manager.shuffle_cards()
-
-        if self.status == 'active' and not self.cards_distributed:
-            players = self.players.all()
-            cards_per_player = len(self.cards) // len(players)
-            for i, player in enumerate(players):
-                player_cards = self.cards[i * cards_per_player:(i + 1) * cards_per_player]
-                player.player_cards = player_cards
-                player.save()
-            self.cards_distributed = True
-
-        if self.status == 'inactive' and self.cards:
-            self.cards = None
-            self.cards_distributed = False
-            for player in self.players.all():
-                player.player_cards = None
-                player.leave_time = timezone.now()
-                player.save()
-            self.last_reset_time = timezone.now()
-
-        super().save(*args, **kwargs)
 
 class Player(models.Model):
     # Player fields
@@ -180,3 +197,4 @@ class Player(models.Model):
     game_room = models.ForeignKey(GameRoom, on_delete=models.CASCADE)
     player_cards = models.JSONField(null=True, blank=True)
     leave_time = models.DateTimeField(null=True, blank=True)
+    channel_name = models.CharField(max_length=255, null=True, blank=True)

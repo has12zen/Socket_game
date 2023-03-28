@@ -13,7 +13,7 @@ class ChatConsumer(WebsocketConsumer):
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room_group_name = "chat_%s" % self.room_name
         try:
-            room = GameRoom.game_manager.join_room(self.room_name, self.scope["user"])
+            room = GameRoom.game_manager.join_room(self.room_name, self.scope["user"],self.channel_name)
             if room is None:
                 raise Exception("Something went wrong")
             async_to_sync(self.channel_layer.group_add)(
