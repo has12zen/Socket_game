@@ -2,11 +2,14 @@ from django.core.signals import request_started
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from datetime import datetime, timedelta
 import secrets
 import random
 from itertools import product
 
+channel_layer = get_channel_layer();
 
 # Create your models here.
 
@@ -108,6 +111,14 @@ class GameRoomManager(models.Manager):
         deck = list(product(suits, ranks))
         random.shuffle(deck)
         return deck
+    
+    def receive_message(self,room_id,username,message,channel_name):
+        room_group_name = f"chat_{room_id}"
+        print(f"{room_id}, {username}, {message}, {channel_name}")
+        async_to_sync(channel_layer.send)(
+            channel_name, {"type": "chat_message", "message": message}
+        )
+
 
 class GameRoom(models.Model):
     ROOM_STATUS = (
