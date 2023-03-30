@@ -1,19 +1,18 @@
 import json
 from django.db import models
 from pathlib import Path
-from picklefield.fields import PickledObjectField
-from .gameRoomManager import GameRoomManager,generate_room_id
+from .gameRoomManager import GameRoomManager, generate_room_id
 
 
 # Create your models here.
 
 class User(models.Model):
-    objects = models.Manager()
     username = models.CharField(max_length=255, unique=True)
     password = models.CharField(max_length=255)
-    roomtoken = models.CharField(max_length=255)
     wins = models.IntegerField(default=0)
     losses = models.IntegerField(default=0)
+    objects = models.Manager()
+
 
 class GameRoom(models.Model):
     ROOM_STATUS = (
@@ -22,21 +21,25 @@ class GameRoom(models.Model):
         ('COMPLETE', 'Complete'),
         ('ACCEPTING', 'Accepting')
     )
-    GAME_STATUS = (
+    GAME_ACTION = (
         ('BID_TYPE', 'bid_type'),
         ('BID_AMOUNT', 'bid_amount'),
         ('TICK', 'tick'),
     )
 
-    room_id = models.CharField(max_length=6, unique=True, default=generate_room_id)
+    room_id = models.CharField(
+        max_length=6, unique=True, default=generate_room_id)
     players = models.ManyToManyField(User, through='Player')
     moves = models.TextField(null=True, blank=True)
     turn = models.IntegerField(null=True, blank=True)
-    status = models.CharField(max_length=10, choices=ROOM_STATUS, default='INACTIVE')
+    status = models.CharField(
+        max_length=10, choices=ROOM_STATUS, default='INACTIVE')
     winnerList = models.TextField(null=True, blank=True)
     looserList = models.TextField(null=True, blank=True)
-    game_state = models.JSONField(default=dict)
-    game_status = models.CharField(max_length=10, choices=GAME_STATUS, default='BID_TYPE')
+    game_header_initialized = models.BooleanField(default=False)
+    game_header = models.JSONField(default=dict)
+    game_action = models.CharField(
+        max_length=10, choices=GAME_ACTION, default='BID_TYPE')
     round_player_index = models.PositiveIntegerField(default=0)
     round_tick_index = models.PositiveIntegerField(default=0)
     # Manager
@@ -54,7 +57,7 @@ class GameRoom(models.Model):
         with file_path.open() as f:
             return json.load(f)
 
-    def initialize_game_state(self):
+    def initialize_game_header(self):
         players = self.players.all()
         user_ids = [player.user_id for player in players]
 
@@ -75,11 +78,16 @@ class GameRoom(models.Model):
             "game_players": user_ids,
             "rounds": [initial_round]
         }
-        self.game_state = initial_game_state
+        self.game_header = initial_game_state
+        self.game_header_initialized = True
         self.save()
-    
+
+    def get_player_index(self, user_id):
+        return self.game_header["game_order"].index(user_id)
+
     def get_current_player_id(self):
-        return self.game_state["game_order"][self.round_player_index]
+        return self.game_header["game_order"][self.round_player_index]
+
 
 class Player(models.Model):
     # Player fields

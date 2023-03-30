@@ -9,7 +9,6 @@ def createRoom(request):
     room = GameRoom.game_manager.create_room(request.user)
     if room is None:
         return render(request, 'chat/createJoinRoom.html', {'error': 'Room could not be created'})
-    GameRoom.game_manager.join_room(room.room_id, request.user)
     return redirect(f'/chat/{room.room_id}')
 
 
@@ -22,14 +21,14 @@ def joinRoom(request):
     except ValidationError as e:
         return render(request, 'chat/createJoinRoom.html', {'error': e})
 
-
     return redirect('/chat/' + roomkey)
 
 
 def home(request):
     if not request.user.is_authenticated:
         return redirect("login-user")
-    return render(request, 'chat/home.html',{})
+    return render(request, 'chat/home.html', {})
+
 
 def chatPage(request, *args, **kwargs):
     if not request.user.is_authenticated:
@@ -62,7 +61,6 @@ def create_user(request):
             form.save()
             user = User.objects.create(
                 username=form.cleaned_data.get('username'),
-                roomtoken='',
                 wins=0,
                 losses=0
             )

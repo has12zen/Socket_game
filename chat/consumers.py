@@ -16,6 +16,7 @@ class ChatConsumer(WebsocketConsumer):
             room = GameRoom.game_manager.join_room(self.room_name, self.scope["user"],self.channel_name)
             if room is None:
                 raise Exception("Something went wrong")
+            GameRoom.game_manager.check_if_game_can_start_or_resume(room)
             async_to_sync(self.channel_layer.group_add)(
                 self.room_group_name, self.channel_name
             )
