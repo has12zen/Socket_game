@@ -1,6 +1,8 @@
 import json
 from django.db import models
+from .card import Card
 from pathlib import Path
+import random
 from .gameRoomManager import GameRoomManager, generate_room_id
 
 
@@ -57,14 +59,27 @@ class GameRoom(models.Model):
         with file_path.open() as f:
             return json.load(f)
 
+    def deal_round_hands(self):
+        current_round_index = self.game_header["current_round_index"]
+        deck = [Card(i) for i in range(52)]
+        random.shuffle(deck)
+        for i, player in enumerate(self.game_header['game_order']):
+            hand = [c.to_dict() for c in deck[(i*13):((i+1) * 13)]]
+            hand.sort(key=(lambda k: k['id']))
+            self.game_header["rounds"][current_round_index]["hands"][player] = hand
+        self.save()
+
+    def initialize_round(self):
+        initial_round = self.read_template_file("round_template.json")
+        current_round_index = self.game_header["current_round_index"]
+        initial_round["round_order"] = self.game_header["game_order"]
+        initial_round['round_number'] = current_round_index
+        self.game_header["rounds"].append(initial_round)
+        self.save()
+
     def initialize_game_header(self):
         players = self.players.all()
         user_ids = [player.user_id for player in players]
-
-        initial_round = self.read_template_file("round_template.json")
-        initial_tick = self.read_template_file("tick_template.json")
-
-        initial_round["ticks"].append(initial_tick)
 
         initial_game_state = {
             "player_count": 0,
@@ -76,10 +91,11 @@ class GameRoom(models.Model):
             "discarded_bags": [0, 0],
             "current_round_index": 0,
             "game_players": user_ids,
-            "rounds": [initial_round]
+            "rounds": []
         }
         self.game_header = initial_game_state
         self.game_header_initialized = True
+        self.status = "ACTIVE"
         self.save()
 
     def get_player_index(self, user_id):
@@ -87,6 +103,11 @@ class GameRoom(models.Model):
 
     def get_current_player_id(self):
         return self.game_header["game_order"][self.round_player_index]
+
+    def rotate_game_order(self):
+        self.game_header["game_order"].append(
+            self.game_header["game_order"].pop(0))
+        self.save()
 
 
 class Player(models.Model):

@@ -30,6 +30,7 @@ class GameRoomManager(models.Manager):
             room = self.get(room_id=room_id)
             return room
         except:
+            print("something went wrong while getting room")
             return None
 
     def join_room(self, room_id, creator, channel_name):
@@ -61,18 +62,23 @@ class GameRoomManager(models.Manager):
             room.save()
             return room
         except Exception as e:
-            print(e, "something went wrong")
+            print(e, "something went wrong while joining room")
             return None
-    
-    def check_if_game_can_start_or_resume(self,room):
-        if room.status == 'ACTIVE':
-            if room.players.filter(leave_time=None).count() == 4:
-                if room.game_header_initialized == False:
-                    room.initialize_game_header()
-                    print("Game Start!")
-                elif room.game_header_initialized == True:
-                    print("resume game")
-        return False
+
+    def check_if_game_can_start_or_resume(self, room):
+        try:
+            if room.status == 'ACTIVE':
+                if room.players.filter(leave_time=None).count() == 4:
+                    if room.game_header_initialized == False:
+                        room.initialize_game_header()
+                        room.initialize_round()
+                        room.deal_round_hands()
+                        print("Game Start!")
+                    elif room.game_header_initialized == True:
+                        print("resume game")
+            return False
+        except Exception as e:
+            print(e, "something went wrong while checking if game can start")
 
     def leave_room(self, room_id, name):
         try:
@@ -90,7 +96,7 @@ class GameRoomManager(models.Manager):
             room.save()
             return room
         except Exception as e:
-            print(e, "something went wrong")
+            print(e, "something went wrong while leaving room")
             return
 
     def kick_out_inactive_players(self):
@@ -127,7 +133,7 @@ class GameRoomManager(models.Manager):
             room = self.get(room_id=room_id)
             user = User.objects.get(username=username)
             player = self.getPlayer(user.id, room.id)
-            if room['status'] != 'ACTIVE':
+            if room.game_header_initialized == False or room['status'] != 'ACTIVE':
                 self.send_message_to_player(
                     room_id, username, {'type': 'game_status', 'game_status': 'Game is not active'})
                 return
