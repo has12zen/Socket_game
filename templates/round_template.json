@@ -1,0 +1,19 @@
+{
+  "round_number": 0,
+  "round_ordering": ["", "", "", ""],
+  "round_spade_in_play": false,
+  "round_winnings": {},
+  "round_hands": {},
+  "round_contract": [
+    {
+      "sum": 0,
+      "bids": [0, 0],
+      "bidString": ["YTB", "YTB"],
+      "blinds": [false, false]
+    }
+  ],
+  "round_score": [0, 0],
+  "round_bags": [0, 0],
+  "tick_index": 0,
+  "ticks": []
+}

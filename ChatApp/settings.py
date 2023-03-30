@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'channels',
     'django_cron',
     'sslserver',
+    'picklefield',
 ]
 ASGI_APPLICATION = 'ChatApp.asgi.application'
 

@@ -36,9 +36,8 @@ class ChatConsumer(WebsocketConsumer):
     # Receive message from WebSocket
     def receive(self, text_data):
         text_data_json = json.loads(text_data)
-        message = text_data_json["message"]
 
-        GameRoom.game_manager.receive_message(self.room_name,self.scope["user"].username,message,self.channel_name)
+        GameRoom.game_manager.receive_message(self.room_name,self.scope["user"].username,text_data_json)
 
     # Receive message from room group
     def chat_message(self, event):

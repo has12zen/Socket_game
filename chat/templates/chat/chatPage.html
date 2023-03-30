@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
   <body>
-    <center><h1>Hello , Welcome to my chat site ! {{request.user}}</h1></center>
+    <center><h1>Hello, Welcome to my chat site! {{request.user}}</h1></center>
     <br>
     {% if request.user.is_authenticated  %}
-    <center> Logout the chat Page <a href = "{% url 'logout-user' %}">Logout</a></center>
+    <center> Logout the chat Page <a href="{% url 'logout-user' %}">Logout</a></center>
     {% endif %}
     <div
       class="chat__item__container"
@@ -12,7 +12,20 @@
       style="font-size: 20px"
     >
       <br />
-      <input type="text" id="id_message_send_input" />
+      <label for="id_message_type">Message Type:</label>
+      <select id="id_message_type">
+        <option value="bidding_type">Bidding Type</option>
+        <option value="bidding_amount">Bidding Amount</option>
+        <option value="play_card">Play Card</option>
+        <option value="join_game">Join Game</option>
+        <option value="leave_game">Leave Game</option>
+      </select>
+      <br />
+      <br />
+      <label for="id_message_data">Message Data:</label>
+      <input type="text" id="id_message_data" />
+      <br />
+      <br />
       <button type="submit" id="id_message_send_button">Send Message</button>
       <br />
       <br />
@@ -25,23 +38,26 @@
       chatSocket.onclose = function (e) {
         console.log("Something unexpected happened !");
       };
-      document.querySelector("#id_message_send_input").focus();
-      document.querySelector("#id_message_send_input").onkeyup = function (e) {
+      document.querySelector("#id_message_data").focus();
+      document.querySelector("#id_message_data").onkeyup = function (e) {
         if (e.keyCode == 13) {
           document.querySelector("#id_message_send_button").click();
         }
       };
       document.querySelector("#id_message_send_button").onclick = function (e) {
-        var messageInput = document.querySelector(
-          "#id_message_send_input"
-        ).value;
-        chatSocket.send(JSON.stringify({ message: messageInput, username : "{{request.user.username}}"}));
+        var messageType = document.querySelector("#id_message_type").value;
+        var messageData = document.querySelector("#id_message_data").value;
+        chatSocket.send(JSON.stringify({
+          type: messageType,
+          message: messageData,
+          username: "{{request.user.username}}"
+        }));
       };
       chatSocket.onmessage = function (e) {
         const data = JSON.parse(e.data);
         var div = document.createElement("div");
-        div.innerHTML = data.username + " : " + data.message;
-        document.querySelector("#id_message_send_input").value = "";
+        div.innerHTML = data.username + " (" + data.type + "): " + data.message;
+        document.querySelector("#id_message_data").value = "";
         document.querySelector("#id_chat_item_container").appendChild(div);
       };
     </script>
