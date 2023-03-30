@@ -35,6 +35,7 @@ class Card:
             "id": self.id,
             "suite": self.suite,
             "suiteID": self.suiteID,
+            "card_played": False,
             "order": self.order,
             "orderID": self.orderID,
         }

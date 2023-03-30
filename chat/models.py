@@ -80,12 +80,17 @@ class GameRoom(models.Model):
     def initialize_game_header(self):
         players = self.players.all()
         user_ids = [player.user_id for player in players]
+        teams = ["A1", "A2", "B1", "B2"]
+        game_player_dict = {}
+        for index, user_id in enumerate(user_ids):
+            game_player_dict[user_id] = teams[index]
 
         initial_game_state = {
             "player_count": 0,
             "cards_distributed": False,
             "winning_value": 500,
             "game_score": [0, 0],
+            "game_player_dict": game_player_dict,
             "game_order": user_ids,
             "game_bags": [0, 0],
             "discarded_bags": [0, 0],
@@ -108,6 +113,29 @@ class GameRoom(models.Model):
         self.game_header["game_order"].append(
             self.game_header["game_order"].pop(0))
         self.save()
+
+    def get_round_player_id(self):
+        round_player_index = self.round_player_index
+        round_index = self.game_header["current_round_index"]
+        return self.game_header["rounds"][round_index]["round_order"][round_player_index]
+
+    def set_player_bid_type(self, bid_type):
+        try:
+            game_player_dict = self.game_header['game_player_dict']
+            player_id = self.get_round_player_id()
+            round_index = self.game_header["current_round_index"]
+            team = game_player_dict[player_id]
+            team_index = team[0]-'A'
+            number = int(team[1])-1
+            if bid_type == True:
+                self.game_header['rounds'][round_index]['contract'][team_index]['bidString'][number] += 'b'
+            self.game_header['rounds'][round_index]['contract'][team_index]['blind'][number] = bid_type
+            self.game_action = "BID_AMOUNT"
+            self.save()
+            return True
+        except Exception as e:
+            print(e, "Failed to set player bid type in GameRoom Model")
+            return False
 
 
 class Player(models.Model):

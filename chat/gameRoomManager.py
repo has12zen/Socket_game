@@ -2,10 +2,10 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import datetime, timedelta
 from django.db import models
-import random
 import secrets
-from itertools import product
 from django.apps import apps
+
+PLAYER_COUNT = 1
 
 
 def generate_room_id():
@@ -52,7 +52,7 @@ class GameRoomManager(models.Manager):
                     # user is was disconnected
                     return room
 
-            if room.players.count() >= 4:
+            if room.players.count() >= PLAYER_COUNT:
                 print("Room is full 444", room.players)
                 return None
             player = Player.objects.create(user=user_instance, game_room=room)
@@ -68,7 +68,7 @@ class GameRoomManager(models.Manager):
     def check_if_game_can_start_or_resume(self, room):
         try:
             if room.status == 'ACTIVE':
-                if room.players.filter(leave_time=None).count() == 4:
+                if room.players.filter(leave_time=None).count() == PLAYER_COUNT:
                     if room.game_header_initialized == False:
                         room.initialize_game_header()
                         room.initialize_round()
@@ -126,11 +126,21 @@ class GameRoomManager(models.Manager):
             player.channel_name, data
         )
 
+    def find_bid_type(self, message):
+        if message in ["Y", 'y', "Yes", "yes", "YES"]:
+            return True
+        elif message in ["N", 'n', "No", "no", "NO"]:
+            return False
+        else:
+            return None
+
     def receive_message(self, room_id, username, text_data_json):
         try:
             User = apps.get_model('chat', 'User')
             message_type = text_data_json["message_type"]
+            message = text_data_json["message"]
             room = self.get(room_id=room_id)
+            round_player_index = room.round_player_index
             user = User.objects.get(username=username)
             player = self.getPlayer(user.id, room.id)
             if room.game_header_initialized == False or room['status'] != 'ACTIVE':
@@ -141,15 +151,40 @@ class GameRoomManager(models.Manager):
                 self.send_message_to_player(room_id, username, {
                                             'type': 'game_status', 'game_status': 'It is not your turn'})
                 return
+            current_round_index = room.game_header['current_round_index']
+            round_player = room.game_header['rounds'][current_round_index]['round_order'][round_player_index]
+            if round_player != user.id:
+                self.send_message_to_player(room_id, username, {
+                    'type': 'game_status', 'game_status': 'It is not your turn'
+                })
+
             if message_type == 'bid_type':
-                room.game_action = 'bid_amt'
-                room.save()
+                bid_type = self.find_bid_type(message)
+                if bid_type != None:
+                    res = room.game_manager.set_player_bid_type(bid_type)
+                    if res == True:
+                        if bid_type == True:
+                            self.send_message_to_player(room_id, username, {
+                                'type': 'game_status', 'game_status': 'Bid type set successfully',
+                            })
+                        elif bid_type == False:
+                            self.send_message_to_player(room_id, username, {
+                                'type': 'game_status', 'game_status': 'Bid type set successfully',
+                                'hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
+                            })
+                        return
+                    # something went wrong
+                    print("something went wrong while setting bid type GameRoomManager")
+                elif bid_type == None:
+                    self.send_message_to_player(room_id, username, {
+                        'type': 'game_status', 'game_status': 'Invalid input please enter yes or no'
+                    })
                 return
 
             elif message_type == 'bidding_amount':
                 # if player index <3:
                 room.game_action = 'bid_type'
-                room.round_player_index = room.round_player_index + 1
+                room.round_player_index = round_player_index + 1
                 # elif player index == 3:
                 #     room.game_status = 'tick'
                 #      room.round_player_index = 0
@@ -158,7 +193,7 @@ class GameRoomManager(models.Manager):
                 card = text_data_json["card"]
                 # if player index <3:
                 room.game_action = 'tick'
-                room.round_player_index = room.round_player_index + 1
+                room.round_player_index = round_player_index + 1
                 # elif player index == 3:
                 # room.game_status = 'tick'
                 # room.round_player_index = 0
@@ -168,6 +203,8 @@ class GameRoomManager(models.Manager):
             else:
                 # Handle unknown message types
                 print(f"Unknown message type: {message_type}")
+                self.send_message_to_player(room_id, username, {
+                                            'type': 'game_status', 'game_status': f'You are doing wrong action you should {room.game_action}'})
         except Exception as e:
             print(e.__cause__, e.__module__,
                   e.__context__, "something went wrong")
