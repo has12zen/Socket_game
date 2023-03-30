@@ -4,6 +4,7 @@ from .card import Card
 from pathlib import Path
 import random
 from .gameRoomManager import GameRoomManager, generate_room_id
+from ChatApp.constants import PLAYER_COUNT
 
 
 # Create your models here.
@@ -136,6 +137,70 @@ class GameRoom(models.Model):
         except Exception as e:
             print(e, "Failed to set player bid type in GameRoom Model")
             return False
+    
+    def set_player_bid_amount(self,amount):
+        try:
+            game_player_dict = self.game_header['game_player_dict']
+            player_id = self.get_round_player_id()
+            round_index = self.game_header["current_round_index"]
+            team = game_player_dict[player_id]
+            team_index = team[0]-'A'
+            number = int(team[1])-1
+            self.game_header['rounds'][round_index]['contract'][team_index]['bids'][number] = amount
+            self.game_action = "BID_TYPE"
+            self.round_player_index += 1
+            if self.round_player_index == PLAYER_COUNT:
+                self.round_player_index = 0
+                self.game_action = "TICK"
+            self.save()
+            return True
+        except Exception as e:
+            print(e, "Failed to set player bid type in GameRoom Model")
+            return False
+    
+    def get_card_index(self,card_id):
+        round_index = self.game_header["current_round_index"]
+        player_id = self.get_round_player_id()
+        for index,card in enumerate(self.game_header['rounds'][round_index]['hands'][player_id]):
+            if card['id'] == card_id:
+                return index
+        return -1
+        
+    
+    def pay_player_card(self,message):
+        try:
+            card_id = int(message)
+            card_index  = self.get_card_index(card_id)
+            if card_index ==-1:
+                raise Exception("Card not found")
+            card = self.game_header['rounds'][self.game_header["current_round_index"]]['hands'][self.get_round_player_id()][card_index]
+            if card.card_played:
+                raise Exception("Card already played")
+            self.game_header['rounds'][self.game_header["current_round_index"]]['hands'][self.get_round_player_id()][card_index].card_played = True
+            self.round_player_index += 1
+            flag_tick_end = False
+            flag_round_end = False
+            if self.round_player_index == PLAYER_COUNT:
+                self.round_player_index = 0
+                self.round_tick_index += 1
+                flag_tick_end = True
+            if self.round_tick_index == 13:
+                self.round_tick_index = 0
+                self.game_header["current_round_index"] += 1
+                flag_round_end = True
+                self.game_action = "BID_TYPE"
+            
+            self.save();
+            if flag_tick_end:
+                # self.tick_end()
+                print("Tick end")
+            if flag_round_end:
+                print("Round end")
+            return True
+        except Exception as e:
+            print(e,"Failed to pay player card in GameRoom Model")
+            return False
+        
 
 
 class Player(models.Model):

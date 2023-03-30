@@ -4,8 +4,7 @@ from datetime import datetime, timedelta
 from django.db import models
 import secrets
 from django.apps import apps
-
-PLAYER_COUNT = 1
+from ChatApp.constants import PLAYER_COUNT
 
 
 def generate_room_id():
@@ -134,6 +133,16 @@ class GameRoomManager(models.Manager):
         else:
             return None
 
+    def find_bid_amount(self, message):
+        try:
+            bid = int(message)
+            if bid >= 0 and bid <= 13:
+                return bid
+            else:
+                raise ValueError
+        except ValueError:
+            return None
+
     def receive_message(self, room_id, username, text_data_json):
         try:
             User = apps.get_model('chat', 'User')
@@ -174,23 +183,25 @@ class GameRoomManager(models.Manager):
                             })
                         return
                     # something went wrong
-                    print("something went wrong while setting bid type GameRoomManager")
-                elif bid_type == None:
-                    self.send_message_to_player(room_id, username, {
-                        'type': 'game_status', 'game_status': 'Invalid input please enter yes or no'
-                    })
+                self.send_message_to_player(room_id, username, {
+                    'type': 'game_status', 'game_status': 'Invalid input please enter yes or no'
+                })
                 return
 
-            elif message_type == 'bidding_amount':
-                # if player index <3:
-                room.game_action = 'bid_type'
-                room.round_player_index = round_player_index + 1
-                # elif player index == 3:
-                #     room.game_status = 'tick'
-                #      room.round_player_index = 0
+            elif message_type == 'bid_amount':
+                amount = self.find_bid_amount(message)
+                if amount != None:
+                    res = room.game_manager.set_player_bid_amount(amount)
+                    if res == True:
+                        self.send_message_to_player(room_id, username, {
+                            'type': 'game_status', 'game_status': 'Bid amount set successfully!\n Good Luck bidding blind','hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
+                        })
+                        return
+                    self.send_message_to_player(room_id, username, {
+                        'type': 'game_status', 'game_status': 'Invalid input please enter a number between 0 and 13'
+                    })
 
             elif message_type == 'tick':
-                card = text_data_json["card"]
                 # if player index <3:
                 room.game_action = 'tick'
                 room.round_player_index = round_player_index + 1
