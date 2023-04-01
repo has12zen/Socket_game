@@ -116,7 +116,7 @@ class GameRoom(models.Model):
             "game_player_dict": game_player_dict,
             "game_order": user_ids,
             "game_bags": [0, 0],
-            "discarded_bags": [0, 0],
+            "game_discarded_bags": [0, 0],
             "current_round_index": 0,
             "game_players": user_ids,
             "rounds": []
@@ -131,11 +131,6 @@ class GameRoom(models.Model):
 
     def get_current_player_id(self):
         return self.game_header["game_order"][self.round_player_index]
-
-    def rotate_game_order(self):
-        self.game_header["game_order"].append(
-            self.game_header["game_order"].pop(0))
-        self.save()
 
     def get_round_player_id(self):
         round_player_index = self.round_player_index
@@ -223,35 +218,149 @@ class GameRoom(models.Model):
             ticks = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick']
             if len(ticks) != PLAYER_COUNT:
                 raise Exception("Tick not complete")
-            
+
             lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suit']
             best_card = ticks[0]['card']
             winner = ticks[0]['player']
 
-            for i,tick in enumerate(ticks):
+            for i, tick in enumerate(ticks):
                 if tick['card']['suiteID'] == lead_suite:
-                     if ((tick['card']['orderID'] > best_card['orderID']) or (best_card['suiteID'] != lead_suite)):
+                    if ((tick['card']['orderID'] > best_card['orderID']) or (best_card['suiteID'] != lead_suite)):
                         best_card = tick['card']
                         winner = tick['player']
             ret_obj = {}
             ret_obj['best_card'] = best_card
             self.game_header['rounds'][round_index]['round_winnings'][winner] += 1
+            # rotate the round_order till winner is first
+            while self.game_header['rounds'][round_index]['round_order'][0] != winner:
+                self.game_header['rounds'][round_index]['round_order'].append(
+                    self.game_header['rounds'][round_index]['round_order'].pop(0))
             self.save()
             return ret_obj
 
         except Exception as e:
             print(e, "Failed to score tick")
             return False
-        
-    
-    def score_round(self):
-        try:
-            print("score round")
-        except Exception as e:
-            return False
-    
 
-    def pay_player_card(self, message):
+    def get_player_from_team(self, team_name):
+        game_player_dict = self.game_header['game_player_dict']
+        for player_id, team in game_player_dict.items():
+            if team == team_name:
+                return player_id
+        return None
+
+    def score_contract(self, round_index, team_index):
+        try:
+            player_1 = self.get_player_from_team('A1')
+            player_2 = self.get_player_from_team('A2')
+            contract = self.game_header['rounds'][round_index]['contract'][team_index]
+            if team_index == 1:
+                player_1 = self.get_player_from_team('B1')
+                player_2 = self.get_player_from_team('B2')
+            win1 = self.game_header['rounds'][round_index]['round_winnings'][player_1]
+            win2 = self.game_header['rounds'][round_index]['round_winnings'][player_2]
+
+            score = 0
+            bags = 0
+            wins = [win1, win2]
+
+            overflow = (win1 + win2) - contract.sum
+            for i, bid in enumerate(contract.bids):
+                # Nil case
+                if (bid == 0):
+                    if (overflow > 0 or (wins[i] != 0)):
+                        # Lost nil
+                        score -= 100
+                        if (contract.blinds[i]):
+                            # Lost nil AND blind
+                            score -= 100
+                    else:
+                        # Met nil
+                        score += 100
+                        if (contract.blinds[i]):
+                            # Met nil AND blind
+                            score += 100
+                # General win case
+                elif (overflow >= 0):
+                    if (contract.blinds[i]):
+                        # Blinds are PERSONAL!
+                        if (wins[i] - bid < 0):
+                            score -= 100
+                        else:
+                            score += 100
+                    else:
+                        # Award points for bid
+                        score += bid * 10
+                else:
+                    # Doc as many points as is appropriate
+                    if (contract.blinds[i]):
+                        score -= 100
+                    else:
+                        score -= bid * 10
+
+            # Handle Bags
+            if (overflow > 0):
+                for i, bid in enumerate(contract.bids):
+                    diff = wins[i] - bid
+                    if (diff > 0):
+                        # One bag/point per extra hand
+                        score += diff
+                        # Blinds don't get bags
+                        if (not contract.blinds[i]):
+                            bags += diff
+            return score, bags
+        except Exception as e:
+            return False, False
+
+    def score_round(self, round_index):
+        scoreA, bagsA = self.score_contract(round_index, 0)
+        scoreB, bagsB = self.score_contract(round_index, 1)
+        if (scoreA == False or scoreB == False):
+            return False
+        self.game_header['rounds'][round_index]['round_score'] = [
+            scoreA, bagsA]
+        self.game_header['rounds'][round_index]['round_bags'] = [scoreB, bagsB]
+        self.game_header['game_score'][0] += scoreA
+        self.game_header['game_score'][1] += scoreB
+        self.game_header['game_bags'][0] += bagsA
+        self.game_header['game_bags'][1] += bagsB
+        for i in range(2):
+            while (self.game_header['game_bags'][i] >= 7):
+                self.game_header['game_bags'][i] -= 7
+                self.game_header['game_discarded_bags'][i] += 1
+                self.game_header['game_score'][i] -= 100
+
+        self.game_header["game_order"].append(
+            self.game_header["game_order"].pop(0))
+        # check game winner
+        res = ""
+        if self.game_header['game_score'][0] >= self.game_header['winning_value'] or self.game_header['game_score'][1] >= self.game_header['winning_value']:
+            if self.game_header['game_score'][0] > self.game_header['game_score'][1]:
+                res = "A"
+            elif self.game_header['game_score'][0] < self.game_header['game_score'][1]:
+                res = "B"
+            else:
+                if self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] < self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                    res = "A"
+                elif self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] > self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                    res = "B"
+        if res != "":
+            if res == "A":
+                player_1 = self.get_player_from_team('A1')
+                player_2 = self.get_player_from_team('A2')
+                player_3 = self.get_player_from_team('B1')
+                player_4 = self.get_player_from_team('B2')
+            elif res == "B":
+                player_1 = self.get_player_from_team('B1')
+                player_2 = self.get_player_from_team('B2')
+                player_3 = self.get_player_from_team('A1')
+                player_4 = self.get_player_from_team('A2')
+            self.winnerList += f"{player_1} {player_2}"
+            self.looserList += f"{player_3} {player_4}"
+        self.save()
+        return res
+
+    def play_player_card(self, message):
         try:
             card_id = int(message)
             card_index = self.get_card_index(card_id)
@@ -288,26 +397,23 @@ class GameRoom(models.Model):
                 self.game_action = "BID_TYPE"
 
             self.save()
+            res = ""
             if flag_tick_end:
-                # self.tick_end()
-                print("Tick end eval")
                 self.score_tick(round_index, tick_index)
             if flag_round_end:
-                print("Round end eval")
-            
+                res = self.score_round(round_index)
+
             if flag_round_end:
-                print("Round end init")
-                self.initialize_round();
+                self.initialize_round()
 
             if flag_tick_end:
-                print("Tick end init")
-                self.initialize_tick();
-            
+                self.initialize_tick()
+
             self.initialize_play_tick()
-            return True
+            return res
         except Exception as e:
             print(e, "Failed to pay player card in GameRoom Model")
-            return False
+            return ""
 
 
 class Player(models.Model):

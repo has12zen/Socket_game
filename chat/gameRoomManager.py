@@ -124,6 +124,11 @@ class GameRoomManager(models.Manager):
         async_to_sync(channel_layer.send)(
             player.channel_name, data
         )
+        
+    def send_message_to_all_players(self, room_name, data):
+        async_to_sync(channel_layer.group_send)(
+            room_name, data
+        )
 
     def find_bid_type(self, message):
         if message in ["Y", 'y', "Yes", "yes", "YES"]:
@@ -149,6 +154,7 @@ class GameRoomManager(models.Manager):
             message_type = text_data_json["message_type"]
             message = text_data_json["message"]
             room = self.get(room_id=room_id)
+            game_room_id = 'chat_%s' % str(room_id)
             round_player_index = room.round_player_index
             user = User.objects.get(username=username)
             player = self.getPlayer(user.id, room.id)
@@ -202,15 +208,12 @@ class GameRoomManager(models.Manager):
                     })
 
             elif message_type == 'tick':
-                # if player index <3:
-                room.game_action = 'tick'
-                room.round_player_index = round_player_index + 1
-                # elif player index == 3:
-                # room.game_status = 'tick'
-                # room.round_player_index = 0
-                # room.round_tick_index = room.round_tick_index + 1
-                # if room.round_tick_index == 13:
-                # room.game_status = 'bid_type'
+                res = room.play_player_card(message)
+                if res !="":
+                    if res =="A":
+                        self.send_message_to_all_players(game_room_id,{'type': 'game_status', 'game_status': 'Team A won the game'})
+                    elif res =="B":
+                        self.send_message_to_all_players(game_room_id,{'type': 'game_status', 'game_status': 'Team B won the game'})
             else:
                 # Handle unknown message types
                 print(f"Unknown message type: {message_type}")
