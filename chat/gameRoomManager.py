@@ -66,8 +66,13 @@ class GameRoomManager(models.Manager):
 
     def check_if_game_can_start_or_resume(self, room):
         try:
-            if room.status == 'ACTIVE':
-                if room.players.filter(leave_time=None).count() == PLAYER_COUNT:
+            if room.status == 'ACTIVE' or room.status == 'ACCEPTING':
+                count = 0
+                players = room.get_room_players(room.id)
+                for player in players:
+                    if player.leave_time == None:
+                        count += 1
+                if count == PLAYER_COUNT:
                     if room.game_header_initialized == False:
                         room.initialize_game_header()
                         room.initialize_round()

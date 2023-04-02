@@ -62,24 +62,30 @@ class GameRoom(models.Model):
             return json.load(f)
 
     def deal_round_hands(self):
-        current_round_index = self.game_header["current_round_index"]
-        deck = [Card(i) for i in range(52)]
-        random.shuffle(deck)
-        for i, player in enumerate(self.game_header['game_order']):
-            hand = [c.to_dict() for c in deck[(i*13):((i+1) * 13)]]
-            hand.sort(key=(lambda k: k['id']))
-            self.game_header["rounds"][current_round_index]["hands"][player] = hand
-        self.save()
+        try:
+            current_round_index = self.game_header["current_round_index"]
+            deck = [Card(i) for i in range(52)]
+            random.shuffle(deck)
+            for i, player in enumerate(self.game_header['game_order']):
+                hand = [c.to_dict() for c in deck[(i*13):((i+1) * 13)]]
+                hand.sort(key=(lambda k: k['id']))
+                self.game_header["rounds"][current_round_index]["hands"][player] = hand
+            self.save()
+        except Exception as e:
+            print(e,"deal_round_hands")
 
     def initialize_round(self):
-        initial_round = self.read_template_file("round_template.json")
-        current_round_index = self.game_header["current_round_index"]
-        initial_round["round_order"] = self.game_header["game_order"]
-        for player in self.game_header["game_order"]:
-            initial_round['round_winnings'][player] = 0
-        initial_round['round_number'] = current_round_index
-        self.game_header["rounds"].append(initial_round)
-        self.save()
+        try:
+            initial_round = self.read_template_file("round_template.json")
+            current_round_index = self.game_header["current_round_index"]
+            initial_round["round_order"] = self.game_header["game_order"]
+            for player in self.game_header["game_order"]:
+                initial_round['round_winnings'][player] = 0
+            initial_round['round_number'] = current_round_index
+            self.game_header["rounds"].append(initial_round)
+            self.save()
+        except Exception as e:
+            print(e,"initialize_round")
 
     def initialize_tick(self):
         initial_tick = self.read_template_file("tick_template.json")
@@ -99,6 +105,10 @@ class GameRoom(models.Model):
         self.game_header["rounds"][current_round_index]["ticks"].append(
             initial_play_tick)
         self.save()
+
+    def get_room_players(self, room_id):
+        players = Player.objects.filter(game_room_id=room_id)
+        return players
 
     def can_player_see_hand(self, user_id):
         current_round_index = self.game_header["current_round_index"]
@@ -126,30 +136,33 @@ class GameRoom(models.Model):
             return None
 
     def initialize_game_header(self):
-        players = self.players.all()
-        user_ids = [player.user_id for player in players]
-        teams = ["A1", "A2", "B1", "B2"]
-        game_player_dict = {}
-        for index, user_id in enumerate(user_ids):
-            game_player_dict[user_id] = teams[index]
+        try:
+            players = self.get_room_players(self.id)
+            user_ids = [player.user_id for player in players]
+            teams = ["A1", "A2", "B1", "B2"]
+            game_player_dict = {}
+            for index, user_id in enumerate(user_ids):
+                game_player_dict[user_id] = teams[index]
 
-        initial_game_state = {
-            "player_count": 0,
-            "cards_distributed": False,
-            "winning_value": 500,
-            "game_score": [0, 0],
-            "game_player_dict": game_player_dict,
-            "game_order": user_ids,
-            "game_bags": [0, 0],
-            "game_discarded_bags": [0, 0],
-            "current_round_index": 0,
-            "game_players": user_ids,
-            "rounds": []
-        }
-        self.game_header = initial_game_state
-        self.game_header_initialized = True
-        self.status = "ACTIVE"
-        self.save()
+            initial_game_state = {
+                "player_count": 0,
+                "cards_distributed": False,
+                "winning_value": 500,
+                "game_score": [0, 0],
+                "game_player_dict": game_player_dict,
+                "game_order": user_ids,
+                "game_bags": [0, 0],
+                "game_discarded_bags": [0, 0],
+                "current_round_index": 0,
+                "game_players": user_ids,
+                "rounds": []
+            }
+            self.game_header = initial_game_state
+            self.game_header_initialized = True
+            self.status = "ACTIVE"
+            self.save()
+        except Exception as e:
+            print(e, "error in initialize_game_header")
 
     def get_player_index(self, user_id):
         return self.game_header["game_order"].index(user_id)
