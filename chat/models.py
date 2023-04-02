@@ -72,7 +72,7 @@ class GameRoom(models.Model):
                 self.game_header["rounds"][current_round_index]["hands"][player] = hand
             self.save()
         except Exception as e:
-            print(e,"deal_round_hands")
+            print(e, "deal_round_hands")
 
     def initialize_round(self):
         try:
@@ -85,7 +85,7 @@ class GameRoom(models.Model):
             self.game_header["rounds"].append(initial_round)
             self.save()
         except Exception as e:
-            print(e,"initialize_round")
+            print(e, "initialize_round")
 
     def initialize_tick(self):
         initial_tick = self.read_template_file("tick_template.json")
@@ -207,6 +207,8 @@ class GameRoom(models.Model):
             if self.round_player_index == PLAYER_COUNT:
                 self.round_player_index = 0
                 self.game_action = "TICK"
+                self.initialize_tick()
+                self.initialize_play_tick()
             self.save()
             return True
         except Exception as e:

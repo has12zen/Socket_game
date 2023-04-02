@@ -196,7 +196,7 @@ class GameRoomManager(models.Manager):
             if message_type == 'bid_type':
                 bid_type = self.find_bid_type(message)
                 if bid_type != None:
-                    res = room.game_manager.set_player_bid_type(bid_type)
+                    res = room.set_player_bid_type(bid_type)
                     if res == True:
                         if bid_type == True:
                             self.send_message_to_player(room_id, username, {
@@ -217,7 +217,7 @@ class GameRoomManager(models.Manager):
             elif message_type == 'bid_amount':
                 amount = self.find_bid_amount(message)
                 if amount != None:
-                    res = room.game_manager.set_player_bid_amount(amount)
+                    res = room.set_player_bid_amount(amount)
                     if res == True:
                         self.send_message_to_player(room_id, username, {
                             'type': 'game_status', 'game_status': 'Bid amount set successfully!\n Good Luck bidding blind', 'hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
