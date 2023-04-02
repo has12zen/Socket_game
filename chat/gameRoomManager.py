@@ -121,13 +121,21 @@ class GameRoomManager(models.Manager):
         room = self.get(room_id=room_name)
         user = User.objects.get(username=username)
         player = self.getPlayer(user.id, room.id)
+        print("Sending message to player", data)
         async_to_sync(channel_layer.send)(
-            player.channel_name, data
+            player.channel_name, {
+                'type': 'chat_message',
+                'message': data
+            }
         )
-        
+
     def send_message_to_all_players(self, room_name, data):
+        print("Sending message to all players", data)
         async_to_sync(channel_layer.group_send)(
-            room_name, data
+            room_name, {
+                'type': 'chat_message',
+                'message': data
+            }
         )
 
     def find_bid_type(self, message):
@@ -160,8 +168,9 @@ class GameRoomManager(models.Manager):
             player = self.getPlayer(user.id, room.id)
             if message_type == 'get_hands':
                 res = room.send_player_hand(user.id)
-                if res!= None:
-                    self.send_message_to_player(room_id, username, {'hands': res})
+                if res != None:
+                    self.send_message_to_player(
+                        room_id, username, {'type': 'hands', 'hands': res})
                     return
                 return
             if room.game_header_initialized == False or room['status'] != 'ACTIVE':
@@ -190,8 +199,8 @@ class GameRoomManager(models.Manager):
                             })
                         elif bid_type == False:
                             self.send_message_to_player(room_id, username, {
-                                'type': 'game_status', 'game_status': 'Bid type set successfully',
-                                'hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
+                                'type': 'hands', 'game_status': 'Bid type set successfully',
+                                'hands': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
                             })
                         return
                     # something went wrong
@@ -206,7 +215,7 @@ class GameRoomManager(models.Manager):
                     res = room.game_manager.set_player_bid_amount(amount)
                     if res == True:
                         self.send_message_to_player(room_id, username, {
-                            'type': 'game_status', 'game_status': 'Bid amount set successfully!\n Good Luck bidding blind','hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
+                            'type': 'game_status', 'game_status': 'Bid amount set successfully!\n Good Luck bidding blind', 'hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
                         })
                         return
                     self.send_message_to_player(room_id, username, {
@@ -215,11 +224,13 @@ class GameRoomManager(models.Manager):
 
             elif message_type == 'tick':
                 res = room.play_player_card(message)
-                if res !="":
-                    if res =="A":
-                        self.send_message_to_all_players(game_room_id,{'type': 'game_status', 'game_status': 'Team A won the game'})
-                    elif res =="B":
-                        self.send_message_to_all_players(game_room_id,{'type': 'game_status', 'game_status': 'Team B won the game'})
+                if res != "":
+                    if res == "A":
+                        self.send_message_to_all_players(
+                            game_room_id, {'type': 'game_status', 'game_status': 'Team A won the game'})
+                    elif res == "B":
+                        self.send_message_to_all_players(
+                            game_room_id, {'type': 'game_status', 'game_status': 'Team B won the game'})
             else:
                 # Handle unknown message types
                 print(f"Unknown message type: {message_type}")
