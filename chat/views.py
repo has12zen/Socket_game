@@ -49,9 +49,7 @@ def chatPage(request, *args, **kwargs):
 def room(request, room_name):
     if not request.user.is_authenticated:
         return redirect("login-user")
-    return render(request, "chat/room.html", {"room_name": room_name})
-
-# Sign Up View
+    return render(request, "chat/chatPage.html", {"room_name": room_name})
 
 
 def create_user(request):

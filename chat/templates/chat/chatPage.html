@@ -2,64 +2,99 @@
 <html>
   <body>
     <center><h1>Hello, Welcome to my chat site! {{request.user}}</h1></center>
-    <br>
-    {% if request.user.is_authenticated  %}
-    <center> Logout the chat Page <a href="{% url 'logout-user' %}">Logout</a></center>
+    <br />
+    {% if request.user.is_authenticated %}
+    <center>
+      Logout the chat Page <a href="{% url 'logout-user' %}">Logout</a>
+    </center>
     {% endif %}
-    <div
-      class="chat__item__container"
-      id="id_chat_item_container"
-      style="font-size: 20px"
-    >
-      <br />
-      <label for="id_message_type">Message Type:</label>
-      <select id="id_message_type">
-        <option value="bidding_type">Bidding Type</option>
-        <option value="bidding_amount">Bidding Amount</option>
-        <option value="play_card">Play Card</option>
-        <option value="join_game">Join Game</option>
-        <option value="leave_game">Leave Game</option>
+    <main>
+      <h1>Game Manager</h1>
+      <label for="message_type">Message Type:</label>
+      <select id="message_type">
+        <option value="bid_type">Bid Type</option>
+        <option value="bid_amount">Bid Amount</option>
+        <option value="tick">Tick</option>
       </select>
       <br />
+      <label for="message">Message:</label>
+      <select id="message"></select>
       <br />
-      <label for="id_message_data">Message Data:</label>
-      <input type="text" id="id_message_data" />
+      <button id="send_button">Send</button>
       <br />
-      <br />
-      <button type="submit" id="id_message_send_button">Send Message</button>
-      <br />
-      <br />
-    </div>
+      <p id="game_status"></p>
+    </main>
     <script>
-      const chatSocket = new WebSocket("ws://" + window.location.host + "/ws/livec/");
-      chatSocket.onopen = function (e) {
-        console.log("The connection was setup successfully !");
-      };
-      chatSocket.onclose = function (e) {
-        console.log("Something unexpected happened !");
-      };
-      document.querySelector("#id_message_data").focus();
-      document.querySelector("#id_message_data").onkeyup = function (e) {
-        if (e.keyCode == 13) {
-          document.querySelector("#id_message_send_button").click();
-        }
-      };
-      document.querySelector("#id_message_send_button").onclick = function (e) {
-        var messageType = document.querySelector("#id_message_type").value;
-        var messageData = document.querySelector("#id_message_data").value;
-        chatSocket.send(JSON.stringify({
-          type: messageType,
-          message: messageData,
-          username: "{{request.user.username}}"
-        }));
-      };
-      chatSocket.onmessage = function (e) {
-        const data = JSON.parse(e.data);
-        var div = document.createElement("div");
-        div.innerHTML = data.username + " (" + data.type + "): " + data.message;
-        document.querySelector("#id_message_data").value = "";
-        document.querySelector("#id_chat_item_container").appendChild(div);
-      };
+      document.addEventListener("DOMContentLoaded", function () {
+        // Populate message select field based on message type
+        document
+          .getElementById("message_type")
+          .addEventListener("change", function () {
+            const message_type = document.getElementById("message_type").value;
+            const message_select = document.getElementById("message");
+            message_select.innerHTML = "";
+            if (message_type === "bid_type") {
+              const option1 = document.createElement("option");
+              option1.text = "Yes";
+              option1.value = "yes";
+              message_select.add(option1);
+              const option2 = document.createElement("option");
+              option2.text = "No";
+              option2.value = "no";
+              message_select.add(option2);
+            } else if (message_type === "bid_amount") {
+              for (let i = 0; i <= 13; i++) {
+                const option = document.createElement("option");
+                option.text = i.toString();
+                option.value = i.toString();
+                message_select.add(option);
+              }
+            } else if (message_type === "tick") {
+              for (let i = 0; i <= 51; i++) {
+                const option = document.createElement("option");
+                option.text = i.toString();
+                option.value = i.toString();
+                message_select.add(option);
+              }
+            }
+          });
+
+        // Send message to server when send button is clicked
+        document
+          .getElementById("send_button")
+          .addEventListener("click", function () {
+            const message_type = document.getElementById("message_type").value;
+            const message = document.getElementById("message").value;
+            const data = {
+              message_type: message_type,
+              message: message,
+            };
+            // Send data to server using WebSocket
+            chatSocket.send(JSON.stringify(data));
+          });
+
+        // Receive game status messages from server and display them
+        chatSocket.onmessage = function (event) {
+          const data = JSON.parse(event.data);
+          if (data.type === "game_status") {
+            const game_status = document.getElementById("game_status");
+            game_status.innerText = data.game_status;
+          }
+        };
+      });
+
+      // Create WebSocket connection
+      const roomName = JSON.parse(
+        document.getElementById("room-name").textContent
+      );
+      var loc = window.location;
+      var wsStart = "ws://";
+      if (loc.protocol == "https:") {
+        wsStart = "wss://";
+      }
+      const chatSocket = new WebSocket(
+        wsStart + window.location.host + "/ws/chat/" + roomName + "/"
+      );
     </script>
   </body>
 </html>
