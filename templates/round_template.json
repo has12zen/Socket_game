@@ -9,13 +9,13 @@
       "sum": 0,
       "bids": [0, 0],
       "bidString": ["YTB", "YTB"],
-      "blinds": [false, false]
+      "blinds": [true, true]
     },
     {
       "sum": 0,
       "bids": [0, 0],
       "bidString": ["YTB", "YTB"],
-      "blinds": [false, false]
+      "blinds": [true, true]
     }
   ],
   "round_score": [0, 0],

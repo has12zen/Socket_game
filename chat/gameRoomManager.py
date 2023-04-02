@@ -158,6 +158,12 @@ class GameRoomManager(models.Manager):
             round_player_index = room.round_player_index
             user = User.objects.get(username=username)
             player = self.getPlayer(user.id, room.id)
+            if message_type == 'get_hands':
+                res = room.send_player_hand(user.id)
+                if res!= None:
+                    self.send_message_to_player(room_id, username, {'hands': res})
+                    return
+                return
             if room.game_header_initialized == False or room['status'] != 'ACTIVE':
                 self.send_message_to_player(
                     room_id, username, {'type': 'game_status', 'game_status': 'Game is not active'})

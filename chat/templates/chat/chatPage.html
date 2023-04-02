@@ -1,5 +1,103 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <title>Game Room</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f2f2f2;
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #333;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 36px;
+        font-weight: bold;
+        margin: 0 0 20px;
+        color: #333;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      select,
+      input[type="text"],
+      .input-group button {
+        font-size: 18px;
+        padding: 10px;
+        border: none;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        margin-top: 5px;
+      }
+
+      select:focus,
+      input[type="text"]:focus {
+        outline: none;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      }
+
+      .input-group {
+        display: flex;
+        align-items: center;
+      }
+
+      .input-group button {
+        background-color: #007bff;
+        color: #fff;
+        margin-left: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .input-group button:hover {
+        background-color: #0069d9;
+      }
+
+      .game-status {
+        margin-top: 20px;
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .hands-container {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 20px;
+      }
+
+      .playing-card {
+        display: inline-block;
+        font-size: 48px;
+        margin-right: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        background-color: #fff;
+        text-align: center;
+      }
+    </style>
+  </head>
   <body>
     <center><h1>Hello, Welcome to my chat site! {{request.user}}</h1></center>
     <br />
@@ -23,10 +121,25 @@
       <button id="send_button">Send</button>
       <br />
       <p id="game_status"></p>
+      <label for="get_hands_input">Get Hands:</label>
+      <input type="text" id="get_hands_input" />
+      <button id="get_hands_button">Get Hands</button>
+      <div id="hands_container"></div>
     </main>
     <script>
       document.addEventListener("DOMContentLoaded", function () {
-        // Populate message select field based on message type
+        const roomName = JSON.parse(
+          document.getElementById("room-name").textContent
+        );
+        var loc = window.location;
+        var wsStart = "ws://";
+        if (loc.protocol === "https:") {
+          wsStart = "wss://";
+        }
+        const chatSocket = new WebSocket(
+          wsStart + window.location.host + "/ws/chat/" + roomName + "/"
+        );
+
         document
           .getElementById("message_type")
           .addEventListener("change", function () {
@@ -50,6 +163,11 @@
                 message_select.add(option);
               }
             } else if (message_type === "tick") {
+              message_select.innerHTML = "";
+              const option = document.createElement("option");
+              option.text = "Select a card";
+              option.value = "";
+              message_select.add(option);
               for (let i = 0; i <= 51; i++) {
                 const option = document.createElement("option");
                 option.text = i.toString();
@@ -59,7 +177,6 @@
             }
           });
 
-        // Send message to server when send button is clicked
         document
           .getElementById("send_button")
           .addEventListener("click", function () {
@@ -69,32 +186,160 @@
               message_type: message_type,
               message: message,
             };
-            // Send data to server using WebSocket
             chatSocket.send(JSON.stringify(data));
           });
 
-        // Receive game status messages from server and display them
         chatSocket.onmessage = function (event) {
           const data = JSON.parse(event.data);
           if (data.type === "game_status") {
             const game_status = document.getElementById("game_status");
             game_status.innerText = data.game_status;
+          } else if (data.type === "hands") {
+            const hands = data.hands;
+            const hands_container = document.getElementById("hands_container");
+            hands_container.innerHTML = "<p>Your hands:</p>";
+            const playing_cards = [
+              "&#127137;",
+              "&#127138;",
+              "&#127139;",
+              "&#127140;",
+              "&#127141;",
+              "&#127142;",
+              "&#127143;",
+              "&#127144;",
+              "&#127145;",
+              "&#127146;",
+              "&#127147;",
+              "&#127148;",
+              "&#127149;",
+              "&#127150;",
+              "&#127153;",
+              "&#127154;",
+              "&#127155;",
+              "&#127156;",
+              "&#127157;",
+              "&#127158;",
+              "&#127159;",
+              "&#127160;",
+              "&#127161;",
+              "&#127162;",
+              "&#127163;",
+              "&#127164;",
+              "&#127169;",
+              "&#127170;",
+              "&#127171;",
+              "&#127172;",
+              "&#127173;",
+              "&#127174;",
+              "&#127175;",
+              "&#127176;",
+              "&#127177;",
+              "&#127178;",
+              "&#127179;",
+              "&#127180;",
+              "&#127181;",
+              "&#127182;",
+              "&#127183;",
+              "&#127184;",
+              "&#127185;",
+              "&#127186;",
+              "&#127187;",
+              "&#127188;",
+              "&#127189;",
+              "&#127190;",
+              "&#127191;",
+              "&#127192;",
+              "&#127193;",
+              "&#127194;",
+              "&#127195;",
+              "&#127196;",
+              "&#127197;",
+              "&#127198;",
+              "&#127199;",
+              "&#127200;",
+              "&#127201;",
+              "&#127202;",
+              "&#127203;",
+              "&#127204;",
+              "&#127205;",
+              "&#127206;",
+              "&#127207;",
+              "&#127208;",
+              "&#127209;",
+              "&#127210;",
+              "&#127211;",
+              "&#127212;",
+              "&#127213;",
+              "&#127214;",
+              "&#127215;",
+              "&#127216;",
+              "&#127217;",
+              "&#127218;",
+              "&#127219;",
+              "&#127220;",
+              "&#127221;",
+              "&#127222;",
+              "&#127223;",
+              "&#127224;",
+              "&#127225;",
+              "&#127226;",
+              "&#127227;",
+              "&#127228;",
+              "&#127229;",
+              "&#127230;",
+              "&#127231;",
+              "&#127232;",
+              "&#127233;",
+              "&#127234;",
+              "&#127235;",
+              "&#127236;",
+              "&#127237;",
+              "&#127238;",
+              "&#127239;",
+              "&#127240;",
+              "&#127241;",
+              "&#127242;",
+              "&#127243;",
+              "&#127244;",
+              "&#127245;",
+              "&#127246;",
+              "&#127247;",
+              "&#127248;",
+              "&#127249;",
+              "&#127250;",
+              "&#127251;",
+              "&#127252;",
+              "&#127253;",
+              "&#127254;",
+              "&#127255;",
+              "&#127256;",
+            ];
+            for (let i = 0; i < hands.length; i++) {
+              const card_num = hands[i];
+              const playing_card = document.createElement("div");
+              playing_card.className = "playing-card";
+              playing_card.innerHTML = playing_cards[card_num];
+              hands_container.appendChild(playing_card);
+            }
           }
         };
-      });
 
-      // Create WebSocket connection
-      const roomName = JSON.parse(
-        document.getElementById("room-name").textContent
-      );
-      var loc = window.location;
-      var wsStart = "ws://";
-      if (loc.protocol == "https:") {
-        wsStart = "wss://";
-      }
-      const chatSocket = new WebSocket(
-        wsStart + window.location.host + "/ws/chat/" + roomName + "/"
-      );
+        // Send get_hands message to server when get hands button is clicked
+        document
+          .getElementById("get_hands_button")
+          .addEventListener("click", function () {
+            const input = document.getElementById("get_hands_input").value;
+            if (input.trim() === "") {
+              return;
+            }
+            const data = {
+              message_type: "get_hands",
+              message: input,
+            };
+            // Send data to server using WebSocket
+            chatSocket.send(JSON.stringify(data));
+          });
+      });
     </script>
   </body>
 </html>

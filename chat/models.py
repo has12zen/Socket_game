@@ -100,6 +100,31 @@ class GameRoom(models.Model):
             initial_play_tick)
         self.save()
 
+    def can_player_see_hand(self, user_id):
+        current_round_index = self.game_header["current_round_index"]
+        current_round = self.game_header["rounds"][current_round_index]
+        round_order = current_round["round_order"]
+        user_index = round_order.index(user_id)
+        team = self.game_header["game_player_dict"][user_id]
+        index1 = 0
+        if team[0] == "B":
+            index1 = 1
+        index2 = 0
+        if team[1] == "2":
+            index2 = 1
+
+        game_action = self.game_action
+        if game_action == "BID_TYPE" or game_action == 'BID_AMOUNT':
+            return not current_round['round_contract'][index1]['blinds'][index2]
+        return True
+
+    def send_player_hand(self, user_id):
+        if self.can_player_see_hand(user_id):
+            selectable = self.get_selectable_cards(user_id)
+            return selectable
+        else:
+            return None
+
     def initialize_game_header(self):
         players = self.players.all()
         user_ids = [player.user_id for player in players]
@@ -183,9 +208,8 @@ class GameRoom(models.Model):
                 return index
         return -1
 
-    def get_playable_cards(self):
+    def get_playable_cards(self, player_id):
         round_index = self.game_header["current_round_index"]
-        player_id = self.get_round_player_id()
         tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
         cards = self.game_header['rounds'][round_index]['hands'][player_id]
         cards = [card for card in cards if card['card_played'] == False]
@@ -364,13 +388,14 @@ class GameRoom(models.Model):
         try:
             card_id = int(message)
             card_index = self.get_card_index(card_id)
-            selectable = self.get_playable_cards()
+            player_id = self.get_round_player_id()
+            selectable = self.get_playable_cards(player_id)
             if card_index not in selectable:
                 raise Exception("Card not playable")
             card = self.game_header['rounds'][self.game_header["current_round_index"]
-                                              ]['hands'][self.get_round_player_id()][card_index]
+                                              ]['hands'][player_id][card_index]
             self.game_header['rounds'][self.game_header["current_round_index"]
-                                       ]['hands'][self.get_round_player_id()][card_index].card_played = True
+                                       ]['hands'][player_id][card_index].card_played = True
             round_index = self.game_header["current_round_index"]
             tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
             self.game_header['rounds'][round_index]['ticks'][tick_index]['tick']['card'] = card
