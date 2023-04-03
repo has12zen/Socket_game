@@ -8,4 +8,7 @@ openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 -subj "/CN=localhost/C=
 
 ```
 export DJANGO_SETTINGS_MODULE=ChatApp.settings
+python3 manage.py makemigrations chat    
+python3 manage.py migrate
+./run.sh
 ```
