@@ -40,6 +40,7 @@ class Card:
             "orderID": self.orderID,
         }
     # For representation (multi-line, so returning array makes it easier to arrange cards horizontally later)
+
     def viz(self):
         symbol = self.suite
         ord = self.order[0]
@@ -49,8 +50,8 @@ class Card:
             pad = ' '
 
         # Style influenced by https://codereview.stackexchange.com/questions/82103/ascii-fication-of-playing-cards
-        return [ "┌───────┐",
+        return ["┌───────┐",
                 f"│{ord}{pad}     │",
                 f"│   {symbol}   │",
                 f"│     {ord}{pad}│",
-                 "└───────┘"]
+                "└───────┘"]

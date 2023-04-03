@@ -1,13 +1,13 @@
+from channels.layers import get_channel_layer
+from chat import routing
+from django.core.asgi import get_asgi_application
+from channels.security.websocket import AllowedHostsOriginValidator
+from channels.auth import AuthMiddlewareStack
+from channels.routing import ProtocolTypeRouter, URLRouter
 import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ChatApp.settings')
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-from channels.security.websocket import AllowedHostsOriginValidator
-from django.core.asgi import get_asgi_application
 django_asgi_app = get_asgi_application()
-from chat import routing
 
-from channels.layers import get_channel_layer
 
 channel_layer = get_channel_layer()
 application = ProtocolTypeRouter(

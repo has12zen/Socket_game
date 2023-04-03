@@ -3,10 +3,17 @@
     <meta charset="utf-8" />
     <title>Chat Rooms</title>
     <style>
-      body {background-color: powderblue; padding: 1.5em;}
-      h1   {color: blue;}
-      p    {color: red;}
-      </style>
+      body {
+        background-color: powderblue;
+        padding: 1.5em;
+      }
+      h1 {
+        color: blue;
+      }
+      p {
+        color: red;
+      }
+    </style>
   </head>
   <body>
     <h1>Join or create room</h1>
@@ -16,34 +23,45 @@
     <form method="post">
       {% csrf_token %}
       <div id="roomKeyDiv">
-      <label for="roomkey">Room Key:</label>
-      <input type="text" name="roomkey" id="roomkey" /><br />
+        <label for="roomkey">Room Key:</label>
+        <input type="text" name="roomkey" id="roomkey" /><br />
       </div>
-      <label><input id="create_room_function" type="radio" name="action" value="create">Create Room</label><br>
-      <label><input id="join_room_function" type="radio" name="action" value="join">Join Room</label><br>
+      <label
+        ><input
+          id="create_room_function"
+          type="radio"
+          name="action"
+          value="create"
+        />Create Room</label
+      ><br />
+      <label
+        ><input
+          id="join_room_function"
+          type="radio"
+          name="action"
+          value="join"
+        />Join Room</label
+      ><br />
       <button type="submit">Create/Join Room</button>
     </form>
     <script>
-      const createRoom = document.getElementById('create_room_function');
-      const joinRoom = document.getElementById('join_room_function');
-      const roomKeyDiv = document.getElementById('roomKeyDiv');
-      createRoom.addEventListener('click',()=>{
-        if(createRoom.checked){
-          roomKeyDiv.style.display = 'none';
+      const createRoom = document.getElementById("create_room_function");
+      const joinRoom = document.getElementById("join_room_function");
+      const roomKeyDiv = document.getElementById("roomKeyDiv");
+      createRoom.addEventListener("click", () => {
+        if (createRoom.checked) {
+          roomKeyDiv.style.display = "none";
+        } else {
+          roomKeyDiv.style.display = "block";
         }
-        else{
-          roomKeyDiv.style.display = 'block';
+      });
+      joinRoom.addEventListener("click", () => {
+        if (joinRoom.checked) {
+          roomKeyDiv.style.display = "block";
+        } else {
+          roomKeyDiv.style.display = "none";
         }
-      })
-      joinRoom.addEventListener('click',()=>{
-        if(joinRoom.checked){
-          roomKeyDiv.style.display = 'block';
-        }
-        else{
-          roomKeyDiv.style.display = 'none';
-        }
-      })
-      
+      });
     </script>
   </body>
 </html>
