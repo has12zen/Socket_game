@@ -71,7 +71,7 @@ class GameRoom(models.Model):
             for i, player in enumerate(self.game_header['game_order']):
                 hand = [c.to_dict() for c in deck[(i*13):((i+1) * 13)]]
                 hand.sort(key=(lambda k: k['id']))
-                self.game_header["rounds"][current_round_index]["hands"][player] = hand
+                self.game_header["rounds"][current_round_index]["round_hands"][player] = hand
             self.save()
         except Exception as e:
             print(e, "deal_round_hands")
@@ -225,7 +225,7 @@ class GameRoom(models.Model):
     def get_card_index(self, card_id):
         round_index = self.game_header["current_round_index"]
         player_id = self.get_round_player_id()
-        for index, card in enumerate(self.game_header['rounds'][round_index]['hands'][player_id]):
+        for index, card in enumerate(self.game_header['rounds'][round_index]['round_hands'][player_id]):
             if card['id'] == card_id:
                 return index
         return -1
@@ -233,7 +233,7 @@ class GameRoom(models.Model):
     def get_playable_cards(self, player_id):
         round_index = self.game_header["current_round_index"]
         tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
-        cards = self.game_header['rounds'][round_index]['hands'][player_id]
+        cards = self.game_header['rounds'][round_index]['round_hands'][player_id]
         cards = [card for card in cards if card['card_played'] == False]
         lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suit']
         spade_in_play = self.game_header['rounds'][round_index]['round_spade_in_play']
@@ -431,9 +431,9 @@ class GameRoom(models.Model):
             if card_index not in selectable:
                 raise Exception("Card not playable")
             card = self.game_header['rounds'][self.game_header["current_round_index"]
-                                              ]['hands'][player_id][card_index]
+                                              ]['round_hands'][player_id][card_index]
             self.game_header['rounds'][self.game_header["current_round_index"]
-                                       ]['hands'][player_id][card_index].card_played = True
+                                       ]['round_hands'][player_id][card_index].card_played = True
             round_index = self.game_header["current_round_index"]
             tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
             self.game_header['rounds'][round_index]['ticks'][tick_index]['tick']['card'] = card

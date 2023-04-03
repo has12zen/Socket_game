@@ -126,6 +126,7 @@
         <h1>Game Manager</h1>
         <label for="message_type">Message Type:</label>
         <select id="message_type">
+          <option value="">-- Please Select --</option>
           <option value="bid_type">Bid Type</option>
           <option value="bid_amount">Bid Amount</option>
           <option value="tick">Tick</option>
@@ -214,7 +215,7 @@
         };
 
         chatSocket.onmessage = function (event) {
-          const data = JSON.parse(event.data);
+          let data = JSON.parse(event.data);
           console.log("something recived", event, data);
           data = data.message;
           if (data.type === "game_status") {

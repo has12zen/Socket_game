@@ -219,11 +219,11 @@ class GameRoomManager(models.Manager):
                         room_id, username, {'type': 'hands', 'hands': res})
                     return
                 return
-            if room.game_header_initialized == False or room['status'] != 'ACTIVE':
+            if room.game_header_initialized == False or room.status!= 'ACTIVE':
                 self.send_message_to_player(
                     room_id, username, {'type': 'game_status', 'game_status': 'Game is not active'})
                 return
-            if message_type != room['game_action']:
+            if message_type != room.game_action:
                 self.send_message_to_player(room_id, username, {
                                             'type': 'game_status', 'game_status': 'It is not your turn'})
                 return
