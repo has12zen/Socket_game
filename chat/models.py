@@ -104,7 +104,7 @@ class GameRoom(models.Model):
         current_tick_index = self.game_header["rounds"][current_round_index]["current_tick_index"]
         initial_play_tick["tick_number"] = current_tick_index
         initial_play_tick['player'] = self.get_round_player_id()
-        self.game_header["rounds"][current_round_index]["ticks"].append(
+        self.game_header["rounds"][current_round_index]["ticks"][current_tick_index]['tick'].append(
             initial_play_tick)
         self.save()
 
@@ -115,8 +115,7 @@ class GameRoom(models.Model):
     def can_player_see_hand(self, user_id):
         current_round_index = self.game_header["current_round_index"]
         current_round = self.game_header["rounds"][current_round_index]
-        round_order = current_round["round_order"]
-        user_index = round_order.index(user_id)
+        user_id = str(user_id)
         team = self.game_header["game_player_dict"][user_id]
         index1 = 0
         if team[0] == "B":
@@ -132,8 +131,10 @@ class GameRoom(models.Model):
 
     def send_player_hand(self, user_id):
         if self.can_player_see_hand(user_id):
-            selectable = self.get_selectable_cards(user_id)
-            return selectable
+            selectable = self.get_playable_cards(user_id)
+            deck = [Card(i) for i in selectable]
+            cards = [c.to_dict() for c in deck]
+            return cards
         else:
             return None
 
@@ -183,14 +184,19 @@ class GameRoom(models.Model):
             game_player_dict = self.game_header['game_player_dict']
             player_id = self.get_round_player_id()
             round_index = self.game_header["current_round_index"]
+            player_id = str(player_id)
+
+            print(player_id, game_player_dict, player_id in game_player_dict)
+
             team = game_player_dict[player_id]
-            team_index = team[0]-'A'
+            print(player_id, game_player_dict, player_id in game_player_dict)
+            team_index = ord(team[0]) - ord('A')
             number = int(team[1])-1
             self.game_header['game_history'].append(
                 f"{player_id} set bid type as {bid_type}")
             if bid_type == True:
-                self.game_header['rounds'][round_index]['contract'][team_index]['bidString'][number] += 'b'
-            self.game_header['rounds'][round_index]['contract'][team_index]['blind'][number] = bid_type
+                self.game_header['rounds'][round_index]['round_contract'][team_index]['bidString'][number] += 'b'
+            self.game_header['rounds'][round_index]['round_contract'][team_index]['blinds'][number] = bid_type
             self.game_action = "BID_AMOUNT"
             self.save()
             return True
@@ -203,10 +209,11 @@ class GameRoom(models.Model):
             game_player_dict = self.game_header['game_player_dict']
             player_id = self.get_round_player_id()
             round_index = self.game_header["current_round_index"]
+            player_id = str(player_id)
             team = game_player_dict[player_id]
-            team_index = team[0]-'A'
+            team_index = ord(team[0]) - ord('A')
             number = int(team[1])-1
-            self.game_header['rounds'][round_index]['contract'][team_index]['bids'][number] = amount
+            self.game_header['rounds'][round_index]['round_contract'][team_index]['bids'][number] = amount
             self.game_action = "BID_TYPE"
             self.round_player_index += 1
             self.game_header['game_history'].append(
@@ -219,7 +226,7 @@ class GameRoom(models.Model):
             self.save()
             return True
         except Exception as e:
-            print(e, "Failed to set player bid type in GameRoom Model")
+            print(e, "Failed to set player bid amount in GameRoom Model")
             return False
 
     def get_card_index(self, card_id):
@@ -233,28 +240,31 @@ class GameRoom(models.Model):
     def get_playable_cards(self, player_id):
         round_index = self.game_header["current_round_index"]
         tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
-        cards = self.game_header['rounds'][round_index]['round_hands'][player_id]
+        cards = self.game_header['rounds'][round_index]['round_hands'][str(
+            player_id)]
+        print(cards)
         cards = [card for card in cards if card['card_played'] == False]
-        lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suit']
+        print(cards)
+        lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite']
         spade_in_play = self.game_header['rounds'][round_index]['round_spade_in_play']
         selectable = []
         for i, card in enumerate(cards):
             if (lead_suite == -1 and spade_in_play):
                 # Everything is good for first card when a spade has been played
-                selectable.append(card.id)
-            elif (lead_suite == -1 and card.suiteID != 3):
+                selectable.append(card['id'])
+            elif (lead_suite == -1 and card['suiteID'] != 3):
                 # Everything is good for first card but spades before a spade has been played
-                selectable.append(card.id)
-            elif (lead_suite == card.suiteID):
+                selectable.append(card['id'])
+            elif (lead_suite == card['suiteID']):
                 # Otherwise, try to match the lead suite
-                selectable.append(card.id)
+                selectable.append(card['id'])
 
         if (len(selectable) == 0):
             # If nothing was playable, all cards are fair game!
-            selectable = [card.id for card in cards]
+            selectable = [card['id'] for card in cards]
         else:
             for i, card in enumerate(cards):
-                if (card.suiteID == 3 and spade_in_play):
+                if (card['suiteID'] == 3 and spade_in_play):
                     selectable.append(i)
 
         return selectable
@@ -299,7 +309,7 @@ class GameRoom(models.Model):
         try:
             player_1 = self.get_player_from_team('A1')
             player_2 = self.get_player_from_team('A2')
-            contract = self.game_header['rounds'][round_index]['contract'][team_index]
+            contract = self.game_header['rounds'][round_index]['round_contract'][team_index]
             if team_index == 1:
                 player_1 = self.get_player_from_team('B1')
                 player_2 = self.get_player_from_team('B2')
