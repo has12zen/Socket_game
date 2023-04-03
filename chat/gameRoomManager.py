@@ -77,6 +77,8 @@ class GameRoomManager(models.Manager):
                         room.initialize_game_header()
                         room.initialize_round()
                         room.deal_round_hands()
+                        room.initialize_tick()
+                        room.initialize_play_tick()
                         print("Game Start!")
                     elif room.game_header_initialized == True:
                         print("resume game")
@@ -102,7 +104,7 @@ class GameRoomManager(models.Manager):
         except Exception as e:
             print(e, "something went wrong while leaving room")
             return
-    
+
     def stop_inactive_rooms(self):
         try:
             rooms = self.filter(status='ACCEPTING')
@@ -110,7 +112,8 @@ class GameRoomManager(models.Manager):
                 if room.created_at < datetime.now() - timedelta(minutes=5):
                     room.initialize_game_header()
                     room.status = 'Complete'
-                    room.game_status['game_history'].append('Room deleted due to no activity')
+                    room.game_status['game_history'].append(
+                        'Room deleted due to no activity')
                     room.save()
                     print('Room deleted')
         except Exception as e:
@@ -207,25 +210,24 @@ class GameRoomManager(models.Manager):
             User = apps.get_model('chat', 'User')
             message_type = text_data_json["message_type"]
             message = text_data_json["message"]
+            print(message_type, message)
             room = self.get(room_id=room_id)
             game_room_id = 'chat_%s' % str(room_id)
             round_player_index = room.round_player_index
             user = User.objects.get(username=username)
             player = self.getPlayer(user.id, room.id)
+            if room.game_header_initialized == False or room.status != 'ACTIVE':
+                self.send_message_to_player(
+                    room_id, username, {'type': 'game_status', 'game_status': 'Game is not active'})
+                return
             if message_type == 'get_hands':
                 res = room.send_player_hand(user.id)
                 if res != None:
                     self.send_message_to_player(
                         room_id, username, {'type': 'hands', 'hands': res})
                     return
-                return
-            if room.game_header_initialized == False or room['status'] != 'ACTIVE':
                 self.send_message_to_player(
-                    room_id, username, {'type': 'game_status', 'game_status': 'Game is not active'})
-                return
-            if message_type != room['game_action']:
-                self.send_message_to_player(room_id, username, {
-                                            'type': 'game_status', 'game_status': 'It is not your turn'})
+                    room_id, username, {'type': 'game_status', 'game_status': 'SET BID type first '})
                 return
             current_round_index = room.game_header['current_round_index']
             round_player = room.game_header['rounds'][current_round_index]['round_order'][round_player_index]
@@ -233,8 +235,13 @@ class GameRoomManager(models.Manager):
                 self.send_message_to_player(room_id, username, {
                     'type': 'game_status', 'game_status': 'It is not your turn'
                 })
+                return
 
-            if message_type == 'bid_type':
+            if message_type != room.game_action:
+                self.send_message_to_player(room_id, username, {
+                                            'type': 'game_status', 'game_status': 'Wrong action'})
+                return
+            if message_type == 'BID_TYPE':
                 bid_type = self.find_bid_type(message)
                 if bid_type != None:
                     res = room.set_player_bid_type(bid_type)
@@ -244,9 +251,11 @@ class GameRoomManager(models.Manager):
                                 'type': 'game_status', 'game_status': 'Bid type set successfully',
                             })
                         elif bid_type == False:
+                            hands = room.game_header['rounds'][current_round_index]['round_hands']
+                            hand = hands[str(user.id)]
                             self.send_message_to_player(room_id, username, {
                                 'type': 'hands', 'game_status': 'Bid type set successfully',
-                                'hands': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
+                                'hands': hand
                             })
                         return
                     # something went wrong
@@ -255,20 +264,20 @@ class GameRoomManager(models.Manager):
                 })
                 return
 
-            elif message_type == 'bid_amount':
+            elif message_type == 'BID_AMOUNT':
                 amount = self.find_bid_amount(message)
                 if amount != None:
                     res = room.set_player_bid_amount(amount)
                     if res == True:
                         self.send_message_to_player(room_id, username, {
-                            'type': 'game_status', 'game_status': 'Bid amount set successfully!\n Good Luck bidding blind', 'hand': room.game_header['rounds'][current_round_index]['round_hands'][round_player_index]
+                            'type': 'game_status', 'game_status': 'Bid amount set successfully!\n Good Luck!'
                         })
                         return
                     self.send_message_to_player(room_id, username, {
                         'type': 'game_status', 'game_status': 'Invalid input please enter a number between 0 and 13'
                     })
 
-            elif message_type == 'tick':
+            elif message_type == 'TICK':
                 res = room.play_player_card(message)
                 if res != "":
                     if res == "A":
