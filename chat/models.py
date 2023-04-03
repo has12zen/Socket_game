@@ -5,6 +5,7 @@ from pathlib import Path
 import random
 from .gameRoomManager import GameRoomManager, generate_room_id
 from ChatApp.constants import PLAYER_COUNT
+from django.utils import timezone
 
 
 # Create your models here.
@@ -45,6 +46,7 @@ class GameRoom(models.Model):
         max_length=10, choices=GAME_ACTION, default='BID_TYPE')
     round_player_index = models.PositiveIntegerField(default=0)
     round_tick_index = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # Manager
     objects = models.Manager()
@@ -407,10 +409,14 @@ class GameRoom(models.Model):
                 u2 = User.objects.get(id=player_2)
                 u3 = User.objects.get(id=player_3)
                 u4 = User.objects.get(id=player_4)
-                GameStats.objects.create(user=u1, game_room=self, win=True,room_id=self.room_id)
-                GameStats.objects.create(user=u2, game_room=self, win=True,room_id=self.room_id)
-                GameStats.objects.create(user=u3, game_room=self, win=False,room_id=self.room_id)
-                GameStats.objects.create(user=u4, game_room=self, win=False,room_id=self.room_id)
+                GameStats.objects.create(
+                    user=u1, game_room=self, win=True, room_id=self.room_id)
+                GameStats.objects.create(
+                    user=u2, game_room=self, win=True, room_id=self.room_id)
+                GameStats.objects.create(
+                    user=u3, game_room=self, win=False, room_id=self.room_id)
+                GameStats.objects.create(
+                    user=u4, game_room=self, win=False, room_id=self.room_id)
             self.save()
             return res
         except Exception as e:
@@ -488,4 +494,4 @@ class GameStats(models.Model):
     game_room = models.ForeignKey(GameRoom, on_delete=models.CASCADE)
     winOrLose = models.BooleanField(default=False)
     room_id = models.CharField(
-        max_length=6, unique=True,default="")
+        max_length=6, unique=True, default="")

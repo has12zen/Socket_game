@@ -102,19 +102,60 @@ class GameRoomManager(models.Manager):
         except Exception as e:
             print(e, "something went wrong while leaving room")
             return
+    
+    def stop_inactive_rooms(self):
+        try:
+            rooms = self.filter(status='ACCEPTING')
+            for room in rooms:
+                if room.created_at < datetime.now() - timedelta(minutes=5):
+                    room.initialize_game_header()
+                    room.status = 'Complete'
+                    room.game_status['game_history'].append('Room deleted due to no activity')
+                    room.save()
+                    print('Room deleted')
+        except Exception as e:
+            print(e, "something went wrong while stopping inactive rooms")
 
     def kick_out_inactive_players(self):
-        rooms = self.filter(status='ACTIVE')
-        print('Kicking out inactive players')
-        for room in rooms:
-            players = room.players.all()
-            for index, player in enumerate(players):
-                if player.leave_time and (datetime.now() - player.leave_time > timedelta(minutes=5)):
-                    # Kick out player
-                    player.leave_time = None
-                    player.save()
+        try:
+            rooms = self.filter(status='ACTIVE')
+            print('Kicking out inactive players')
+            for room in rooms:
+                players = room.players.all()
+                winning_player = []
+                loosing_players = []
+                for index, player in enumerate(players):
+                    if player.leave_time and (datetime.now() - player.leave_time > timedelta(minutes=5)):
+                        # Kick out player
+                        player.leave_time = None
+                        player.save()
+                        loosing_players.append(player.user_id)
+                if len(loosing_players) != 0:
+                    if room.game_header_initialized == False:
+                        room.initialize_game_header()
                     room.status = 'Complete'
-            room.save()
+                    for player in players:
+                        if player.user_id not in loosing_players:
+                            winning_player.append(player.user_id)
+                    GameStats = apps.get_model('chat', 'GameStats')
+                    res_str = "Winning players:"
+                    User = apps.get_model('chat', 'User')
+                    for player in winning_player:
+                        user = User.objects.get(id=player)
+                        GameStats.objects.create(
+                            user=user, game_room=room, room_id=room.id, winOrLose=True)
+                        res_str += str(player)+","
+                    res_str = res_str[:-1]
+                    res_str += "\nLoosing players:"
+                    for player in loosing_players:
+                        GameStats.objects.create(
+                            user=user, game_room=room, room_id=room.id, winOrLose=False)
+                        res_str += str(player)+","
+                    res_str = res_str[:-1]
+                    room.game_header['game_history'].append(res_str)
+                room.save()
+        except Exception as e:
+            print(e, "something went wrong while kicking out inactive players")
 
     def getPlayer(self, user_id, room_id):
         Player = apps.get_model('chat', 'Player')
