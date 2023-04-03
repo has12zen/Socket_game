@@ -55,6 +55,20 @@ def completedGames(request):
         completed_rooms = None
     return render(request, 'chat/completed_games.html', {'completed_rooms': completed_rooms})
 
+def roomHistory(request):
+    if not request.user.is_authenticated:
+        return redirect("login-user")
+    room_id = request.GET.get('id', '')
+    user = request.user
+    user = User.objects.get(username=user.username)
+    
+    try:
+        room = GameRoom.objects.get(room_id=room_id)
+        gamestats = GameStats.objects.filter(game_room=room,user=user).order_by('id')
+    except (GameRoom.DoesNotExist, GameStats.DoesNotExist):
+        return render(request, 'chat/roomHistory.html', {'room_id': room_id, 'error': 'Room not found.'})
+    
+    return render(request, 'chat/roomHistory.html', {'room': room, 'gamestats': gamestats})
 
 def chatPage(request, *args, **kwargs):
     if not request.user.is_authenticated:
