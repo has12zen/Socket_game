@@ -155,6 +155,7 @@ class GameRoom(models.Model):
                 "game_discarded_bags": [0, 0],
                 "current_round_index": 0,
                 "game_players": user_ids,
+                "game_history": [],
                 "rounds": []
             }
             self.game_header = initial_game_state
@@ -183,6 +184,8 @@ class GameRoom(models.Model):
             team = game_player_dict[player_id]
             team_index = team[0]-'A'
             number = int(team[1])-1
+            self.game_header['game_history'].append(
+                f"{player_id} set bid type as {bid_type}")
             if bid_type == True:
                 self.game_header['rounds'][round_index]['contract'][team_index]['bidString'][number] += 'b'
             self.game_header['rounds'][round_index]['contract'][team_index]['blind'][number] = bid_type
@@ -204,6 +207,8 @@ class GameRoom(models.Model):
             self.game_header['rounds'][round_index]['contract'][team_index]['bids'][number] = amount
             self.game_action = "BID_TYPE"
             self.round_player_index += 1
+            self.game_header['game_history'].append(
+                f"{player_id} set bid amount as {amount}")
             if self.round_player_index == PLAYER_COUNT:
                 self.round_player_index = 0
                 self.game_action = "TICK"
@@ -352,52 +357,64 @@ class GameRoom(models.Model):
             return False, False
 
     def score_round(self, round_index):
-        scoreA, bagsA = self.score_contract(round_index, 0)
-        scoreB, bagsB = self.score_contract(round_index, 1)
-        if (scoreA == False or scoreB == False):
-            return False
-        self.game_header['rounds'][round_index]['round_score'] = [
-            scoreA, bagsA]
-        self.game_header['rounds'][round_index]['round_bags'] = [scoreB, bagsB]
-        self.game_header['game_score'][0] += scoreA
-        self.game_header['game_score'][1] += scoreB
-        self.game_header['game_bags'][0] += bagsA
-        self.game_header['game_bags'][1] += bagsB
-        for i in range(2):
-            while (self.game_header['game_bags'][i] >= 7):
-                self.game_header['game_bags'][i] -= 7
-                self.game_header['game_discarded_bags'][i] += 1
-                self.game_header['game_score'][i] -= 100
+        try:
+            scoreA, bagsA = self.score_contract(round_index, 0)
+            scoreB, bagsB = self.score_contract(round_index, 1)
+            if (scoreA == False or scoreB == False):
+                return False
+            self.game_header['rounds'][round_index]['round_score'] = [
+                scoreA, bagsA]
+            self.game_header['rounds'][round_index]['round_bags'] = [
+                scoreB, bagsB]
+            self.game_header['game_score'][0] += scoreA
+            self.game_header['game_score'][1] += scoreB
+            self.game_header['game_bags'][0] += bagsA
+            self.game_header['game_bags'][1] += bagsB
+            for i in range(2):
+                while (self.game_header['game_bags'][i] >= 7):
+                    self.game_header['game_bags'][i] -= 7
+                    self.game_header['game_discarded_bags'][i] += 1
+                    self.game_header['game_score'][i] -= 100
 
-        self.game_header["game_order"].append(
-            self.game_header["game_order"].pop(0))
-        # check game winner
-        res = ""
-        if self.game_header['game_score'][0] >= self.game_header['winning_value'] or self.game_header['game_score'][1] >= self.game_header['winning_value']:
-            if self.game_header['game_score'][0] > self.game_header['game_score'][1]:
-                res = "A"
-            elif self.game_header['game_score'][0] < self.game_header['game_score'][1]:
-                res = "B"
-            else:
-                if self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] < self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+            self.game_header["game_order"].append(
+                self.game_header["game_order"].pop(0))
+            # check game winner
+            res = ""
+            if self.game_header['game_score'][0] >= self.game_header['winning_value'] or self.game_header['game_score'][1] >= self.game_header['winning_value']:
+                if self.game_header['game_score'][0] > self.game_header['game_score'][1]:
                     res = "A"
-                elif self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] > self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                elif self.game_header['game_score'][0] < self.game_header['game_score'][1]:
                     res = "B"
-        if res != "":
-            if res == "A":
-                player_1 = self.get_player_from_team('A1')
-                player_2 = self.get_player_from_team('A2')
-                player_3 = self.get_player_from_team('B1')
-                player_4 = self.get_player_from_team('B2')
-            elif res == "B":
-                player_1 = self.get_player_from_team('B1')
-                player_2 = self.get_player_from_team('B2')
-                player_3 = self.get_player_from_team('A1')
-                player_4 = self.get_player_from_team('A2')
-            self.winnerList += f"{player_1} {player_2}"
-            self.looserList += f"{player_3} {player_4}"
-        self.save()
-        return res
+                else:
+                    if self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] < self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                        res = "A"
+                    elif self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] > self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                        res = "B"
+            if res != "":
+                if res == "A":
+                    player_1 = self.get_player_from_team('A1')
+                    player_2 = self.get_player_from_team('A2')
+                    player_3 = self.get_player_from_team('B1')
+                    player_4 = self.get_player_from_team('B2')
+                elif res == "B":
+                    player_1 = self.get_player_from_team('B1')
+                    player_2 = self.get_player_from_team('B2')
+                    player_3 = self.get_player_from_team('A1')
+                    player_4 = self.get_player_from_team('A2')
+                self.game_header['game_history'].append(
+                    f"{player_1} {player_2} win the game\n {player_3} {player_4} loose the game")
+                u1 = User.objects.get(id=player_1)
+                u2 = User.objects.get(id=player_2)
+                u3 = User.objects.get(id=player_3)
+                u4 = User.objects.get(id=player_4)
+                GameStats.objects.create(user=u1, game_room=self, win=True)
+                GameStats.objects.create(user=u2, game_room=self, win=True)
+                GameStats.objects.create(user=u3, game_room=self, win=False)
+                GameStats.objects.create(user=u4, game_room=self, win=False)
+            self.save()
+            return res
+        except Exception as e:
+            print(e, "Score round models.py")
 
     def play_player_card(self, message):
         try:
@@ -435,7 +452,8 @@ class GameRoom(models.Model):
                 self.game_header["current_round_index"] += 1
                 flag_round_end = True
                 self.game_action = "BID_TYPE"
-
+            self.game_header['game_history'].append(
+                f"{player_id} played {card}")
             self.save()
             res = ""
             if flag_tick_end:
@@ -463,3 +481,9 @@ class Player(models.Model):
     player_cards = models.JSONField(null=True, blank=True)
     leave_time = models.DateTimeField(null=True, blank=True)
     channel_name = models.CharField(max_length=255, null=True, blank=True)
+
+
+class GameStats(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    game_room = models.ForeignKey(GameRoom, on_delete=models.CASCADE)
+    winOrLose = models.BooleanField(default=False)

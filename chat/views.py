@@ -2,7 +2,8 @@ from django.forms import ValidationError
 from django.shortcuts import render, redirect
 from django.views.generic import CreateView
 from django.contrib.auth.forms import UserCreationForm
-from .models import User, GameRoom, GameRoomManager
+from django.db.models import Count
+from .models import User, GameRoom, GameRoomManager, GameStats
 
 
 def createRoom(request):
@@ -27,7 +28,17 @@ def joinRoom(request):
 def home(request):
     if not request.user.is_authenticated:
         return redirect("login-user")
-    return render(request, 'chat/home.html', {})
+    user = request.user
+    user = User.objects.get(username=user.username)
+    try:
+        game_stats = GameStats.objects.filter(user=user).values('winOrLose').annotate(count=Count('id'))
+        wins = game_stats.get(winOrLose=True)['count']
+        losses = game_stats.get(winOrLose=False)['count']
+    except GameStats.DoesNotExist:
+        wins = 0
+        losses = 0
+
+    return render(request, 'chat/home.html', {'wins': wins, 'losses': losses})
 
 
 def chatPage(request, *args, **kwargs):
