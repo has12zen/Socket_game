@@ -407,10 +407,10 @@ class GameRoom(models.Model):
                 u2 = User.objects.get(id=player_2)
                 u3 = User.objects.get(id=player_3)
                 u4 = User.objects.get(id=player_4)
-                GameStats.objects.create(user=u1, game_room=self, win=True)
-                GameStats.objects.create(user=u2, game_room=self, win=True)
-                GameStats.objects.create(user=u3, game_room=self, win=False)
-                GameStats.objects.create(user=u4, game_room=self, win=False)
+                GameStats.objects.create(user=u1, game_room=self, win=True,room_id=self.room_id)
+                GameStats.objects.create(user=u2, game_room=self, win=True,room_id=self.room_id)
+                GameStats.objects.create(user=u3, game_room=self, win=False,room_id=self.room_id)
+                GameStats.objects.create(user=u4, game_room=self, win=False,room_id=self.room_id)
             self.save()
             return res
         except Exception as e:
@@ -487,3 +487,5 @@ class GameStats(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     game_room = models.ForeignKey(GameRoom, on_delete=models.CASCADE)
     winOrLose = models.BooleanField(default=False)
+    room_id = models.CharField(
+        max_length=6, unique=True,default="")

@@ -31,7 +31,8 @@ def home(request):
     user = request.user
     user = User.objects.get(username=user.username)
     try:
-        game_stats = GameStats.objects.filter(user=user).values('winOrLose').annotate(count=Count('id'))
+        game_stats = GameStats.objects.filter(user=user).values(
+            'winOrLose').annotate(count=Count('id'))
         wins = game_stats.get(winOrLose=True)['count']
         losses = game_stats.get(winOrLose=False)['count']
     except GameStats.DoesNotExist:
@@ -39,6 +40,20 @@ def home(request):
         losses = 0
 
     return render(request, 'chat/home.html', {'wins': wins, 'losses': losses})
+
+
+def completedGames(request):
+    if not request.user.is_authenticated:
+        return redirect("login-user")
+
+    user = request.user
+    user = User.objects.get(username=user.username)
+    try:
+        completed_rooms = GameStats.objects.filter(
+            user=user).values('room_id', 'winOrLose')
+    except:
+        completed_rooms = None
+    return render(request, 'chat/completed_games.html', {'completed_rooms': completed_rooms})
 
 
 def chatPage(request, *args, **kwargs):
