@@ -286,6 +286,9 @@ class GameRoomManager(models.Manager):
                     elif res == "B":
                         self.send_message_to_all_players(
                             game_room_id, {'type': 'game_status', 'game_status': 'Team B won the game'})
+                    elif res == "card":
+                        self.send_message_to_all_players(
+                            game_room_id, {'type': 'game_status', 'game_status': f'Card played successfully by player {username}'})
             else:
                 # Handle unknown message types
                 print(f"Unknown message type: {message_type}")

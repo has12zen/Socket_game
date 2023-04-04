@@ -14,9 +14,8 @@
       }
 
       main {
-        margin: 0 auto;
+        margin: 0;
         width: 100%;
-        padding: 20px;
         align-items: center;
       }
 
@@ -89,7 +88,8 @@
       }
 
       .hands-container {
-        display: flex;
+        display: grid;
+        grid-template-columns: 8em 8em 8em 8em 8em 8em;
         flex-wrap: wrap;
         justify-content: space-between;
         margin: 10px 0;
@@ -161,7 +161,7 @@
         <label for="get_hands_input">Get Hands:</label>
         <input disabled type="text" id="get_hands_input" />
         <button type="button" id="get_hands_button">Get Hands</button>
-        <div id="hands_container"></div>
+        <div id="hands_container" class="hands-container"></div>
         {{ room_name|json_script:"room-name" }}
       </div>
     </main>
@@ -178,6 +178,10 @@
         const chatSocket = new WebSocket(
           wsStart + window.location.host + "/ws/chat/" + roomName + "/"
         );
+        let selectable = [];
+        for (let i = 0; i <= 51; i++) {
+          selectable.push(i);
+        }
 
         document
           .getElementById("message_type")
@@ -207,10 +211,10 @@
               option.text = "Select a card";
               option.value = "";
               message_select.add(option);
-              for (let i = 0; i <= 51; i++) {
+              for (let i = 0; i < selectable.length; i++) {
                 const option = document.createElement("option");
-                option.text = i.toString();
-                option.value = i.toString();
+                option.text = selectable[i].toString();
+                option.value = selectable[i].toString();
                 message_select.add(option);
               }
             }
@@ -244,7 +248,6 @@
           } else if (data.type === "hands") {
             const hands = data.hands;
             const hands_container = document.getElementById("hands_container");
-            hands_container.innerHTML = "<p>Your hands:</p>";
             const playing_cards = [
               "&#127137;",
               "&#127138;",
@@ -361,6 +364,8 @@
               "&#127255;",
               "&#127256;",
             ];
+            // remove all previous cards
+            hands_container.innerHTML = "";
             for (let i = 0; i < hands.length; i++) {
               const card_num = hands[i];
               const playing_card = document.createElement("div");
@@ -375,6 +380,11 @@
                                       }</div>
                                   `;
               hands_container.appendChild(card_div);
+            }
+            selectable = [];
+            for (let i = 0; i < hands.length; i++) {
+              const card_num = hands[i];
+              selectable.push(card_num.id);
             }
           }
         };
