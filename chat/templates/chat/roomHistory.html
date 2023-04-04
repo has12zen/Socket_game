@@ -1,40 +1,28 @@
 <!DOCTYPE html>
 <html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Room History</title>
-</head>
-<body>
-	<div>
-		<h1>Room History: {{ room.room_id }}</h1>
-		{% if error %}
-			<p>{{ error }}</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Room History</title>
+  </head>
+
+  <body>
+    <div>
+      <h1>Room History: {{ room.room_id }}</h1>
+      {% if error %}
+      <p>{{ error }}</p>
+      {% else %} 
+	  	{% if room.game_header %} 
+	  		{% if room.game_header.game_history%} 
+				{% for sent in room.game_header.game_history %}
+      				<p>{{ sent }}</p>
+      			{% endfor %} 
+			{% endif %} 
 		{% else %}
-			{% if gamestats %}
-				<table>
-					<thead>
-						<tr>
-							<th>Player</th>
-							<th>Action</th>
-							<th>Value</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for gamestat in gamestats %}
-							<tr>
-								<td>{{ gamestat.user.username }}</td>
-								<td>{{ gamestat.game_action }}</td>
-								<td>{{ gamestat.game_header[gamestat.game_action] }}</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			{% else %}
-				<p>No game history found.</p>
-			{% endif %}
-		{% endif %}
-		<a href="/completedGames">Back to Completed Games</a>
-	</div>
-</body>
+      		<p>No game history found.</p>
+      	{% endif %} 
+	  {% endif %}
+      <a href="/completedGames">Back to Completed Games</a>
+    </div>
+  </body>
 </html>

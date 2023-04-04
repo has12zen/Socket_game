@@ -7,6 +7,7 @@ urlpatterns = [
     path("", chat_views.home, name="home"),
     path("createJoin/", chat_views.chatPage, name="createJoin"),
     path("completedGames/", chat_views.completedGames, name="completedGames"),
+    path('roomHistory/', chat_views.roomHistory, name="roomHistory"),
     path("<str:room_name>/", chat_views.room, name="room"),
     # login-section
     path("auth/login/", LoginView.as_view(template_name="chat/LoginPage.html"),

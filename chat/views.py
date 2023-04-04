@@ -30,12 +30,21 @@ def home(request):
         return redirect("login-user")
     user = request.user
     user = User.objects.get(username=user.username)
+    print("user", user.id)
     try:
-        game_stats = GameStats.objects.filter(user=user).values(
+        game_stats = GameStats.objects.filter(user_id=user.id).values(
             'winOrLose').annotate(count=Count('id'))
-        wins = game_stats.get(winOrLose=True)['count']
-        losses = game_stats.get(winOrLose=False)['count']
-    except GameStats.DoesNotExist:
+        print(game_stats, 'gamestats')
+        wins = 0
+        losses = 0
+
+        for stat in game_stats:
+            if stat['winOrLose'] == True:
+                wins = stat['count']
+            elif stat['winOrLose'] == False:
+                losses = stat['count']
+    except Exception as e:
+        print(e, "failed to get")
         wins = 0
         losses = 0
 
@@ -49,11 +58,13 @@ def completedGames(request):
     user = request.user
     user = User.objects.get(username=user.username)
     try:
-        completed_rooms = GameStats.objects.filter(
+        completed_games = GameStats.objects.filter(
             user=user).values('room_id', 'winOrLose')
-    except:
-        completed_rooms = None
-    return render(request, 'chat/completed_games.html', {'completed_rooms': completed_rooms})
+    except Exception as e:
+        print(e, "compltedGames")
+        completed_games = None
+    return render(request, 'chat/completed_games.html', {'completed_games': completed_games})
+
 
 def roomHistory(request):
     if not request.user.is_authenticated:
@@ -61,14 +72,18 @@ def roomHistory(request):
     room_id = request.GET.get('id', '')
     user = request.user
     user = User.objects.get(username=user.username)
-    
+
     try:
         room = GameRoom.objects.get(room_id=room_id)
-        gamestats = GameStats.objects.filter(game_room=room,user=user).order_by('id')
+        gamestats = GameStats.objects.filter(
+            game_room=room, user=user).order_by('id')
+        print(gamestats, "gamestats")
     except (GameRoom.DoesNotExist, GameStats.DoesNotExist):
+        print("room not found")
         return render(request, 'chat/roomHistory.html', {'room_id': room_id, 'error': 'Room not found.'})
-    
+
     return render(request, 'chat/roomHistory.html', {'room': room, 'gamestats': gamestats})
+
 
 def chatPage(request, *args, **kwargs):
     if not request.user.is_authenticated:
