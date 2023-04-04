@@ -226,8 +226,6 @@ class GameRoom(models.Model):
             if self.round_player_index == PLAYER_COUNT:
                 self.round_player_index = 0
                 self.game_action = "TICK"
-                self.initialize_tick()
-                self.initialize_play_tick()
             self.save()
             return True
         except Exception as e:
@@ -244,7 +242,7 @@ class GameRoom(models.Model):
                 return card_id, index
         return -1, -1
 
-    def get_playable_cards(self, player_id,send_all=False):
+    def get_playable_cards(self, player_id, send_all=False):
         round_index = self.game_header["current_round_index"]
         tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
         cards = self.game_header['rounds'][round_index]['round_hands'][str(
@@ -282,9 +280,9 @@ class GameRoom(models.Model):
         try:
             ticks = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick']
             if len(ticks) != PLAYER_COUNT:
-                raise Exception("Tick not complete")
-
-            lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suit']
+                print(len(ticks), "Tick not complete")
+                # raise Exception("Tick not complete")
+            lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite']
             best_card = ticks[0]['card']
             winner = ticks[0]['player']
 
@@ -295,11 +293,16 @@ class GameRoom(models.Model):
                         winner = tick['player']
             ret_obj = {}
             ret_obj['best_card'] = best_card
+            ret_obj['tick_winner'] = winner
             self.game_header['rounds'][round_index]['round_winnings'][winner] += 1
             # rotate the round_order till winner is first
-            while self.game_header['rounds'][round_index]['round_order'][0] != winner:
+            maxcount = 0
+            while self.game_header['rounds'][round_index]['round_order'][0] != int(winner):
+                maxcount += 1
                 self.game_header['rounds'][round_index]['round_order'].append(
                     self.game_header['rounds'][round_index]['round_order'].pop(0))
+                if maxcount > 2*PLAYER_COUNT:
+                    raise Exception("Infinite loop in score_tick")
             self.save()
             return ret_obj
 
@@ -442,67 +445,76 @@ class GameRoom(models.Model):
             print(e, "Score round models.py")
 
     def play_player_card(self, message):
-        # try:
-        card_id = int(message)
-        card_ide, card_index = self.get_card_index(card_id)
-        player_id = self.get_round_player_id()
-        selectable = self.get_playable_cards(player_id)
-        round_player_index = self.round_player_index
-        if card_ide not in selectable:
-            raise Exception("Card not playable")
-        player_id = str(player_id)
-        round_index = self.game_header["current_round_index"]
-        print('card_index', card_ide, card_index, round_index)
-        card = self.game_header['rounds'][round_index]['round_hands'][player_id][card_index]
-        print('card', card)
-        self.game_header['rounds'][self.game_header["current_round_index"]
-                                   ]['round_hands'][player_id][card_index]['card_played'] = True
-        tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
-        print(tick_index)
-        self.game_header['rounds'][round_index]['ticks'][tick_index]['tick'][round_player_index]['card'] = card
-        # Update lead suite
-        lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite']
-        if (lead_suite == -1):
-            self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite'] = card['suiteID']
-        if (card['suiteID'] == 3):
-            self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite'] = 3
-            self.game_header['rounds'][round_index]['round_spade_in_play'] = True
-        self.round_player_index += 1
-        flag_tick_end = False
-        flag_round_end = False
+        try:
+            card_id = int(message)
+            card_ide, card_index = self.get_card_index(card_id)
+            player_id = self.get_round_player_id()
+            selectable = self.get_playable_cards(player_id)
+            round_player_index = self.round_player_index
+            if card_ide not in selectable:
+                raise Exception("Card not playable")
+            player_id = str(player_id)
+            round_index = self.game_header["current_round_index"]
+            card = self.game_header['rounds'][round_index]['round_hands'][player_id][card_index]
+            self.game_header['rounds'][self.game_header["current_round_index"]
+                                       ]['round_hands'][player_id][card_index]['card_played'] = True
+            tick_index = self.game_header["rounds"][round_index]["current_tick_index"]
+            self.game_header['rounds'][round_index]['ticks'][tick_index]['tick'][round_player_index]['card'] = card
+            self.game_header['rounds'][round_index]['ticks'][tick_index]['tick'][round_player_index]['player'] = player_id
+            self.game_header['rounds'][round_index]['ticks'][tick_index]['tick'][round_player_index]['tick_number'] = tick_index
+            # Update lead suite
+            lead_suite = self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite']
+            if (lead_suite == -1):
+                self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite'] = card['suiteID']
+            if (card['suiteID'] == 3):
+                self.game_header['rounds'][round_index]['ticks'][tick_index]['tick_lead_suite'] = 3
+                self.game_header['rounds'][round_index]['round_spade_in_play'] = True
+            self.round_player_index += 1
+            flag_tick_end = False
+            flag_round_end = False
 
-        if self.round_player_index == PLAYER_COUNT:
-            self.round_player_index = 0
-            self.round_tick_index += 1
-            self.game_header["rounds"][round_index]["current_tick_index"] += 1
-            flag_tick_end = True
-        if self.round_tick_index == 13:
-            self.round_tick_index = 0
-            self.game_header["current_round_index"] += 1
-            flag_round_end = True
-            self.game_action = "BID_TYPE"
-        self.game_header['game_history'].append(
-            f"{player_id} played {card}")
-        self.save()
-        res = ""
-        if flag_tick_end:
-            self.score_tick(round_index, tick_index)
-        if flag_round_end:
-            res = self.score_round(round_index)
+            if self.round_player_index == PLAYER_COUNT:
+                self.round_player_index = 0
+                self.round_tick_index += 1
+                self.game_header["rounds"][round_index]["current_tick_index"] += 1
+                flag_tick_end = True
+            if self.round_tick_index == 13:
+                self.round_tick_index = 0
+                self.game_header["current_round_index"] += 1
+                flag_round_end = True
+                self.game_action = "BID_TYPE"
+            self.game_header['game_history'].append(
+                f"{player_id} played {card}")
+            self.save()
+            res = ""
+            tick_res = ""
+            if flag_tick_end:
+                ret_obj = self.score_tick(round_index, tick_index)
+                user_id = ret_obj['tick_winner']
+                user_id = int(user_id)
+                new_order = "\nNew order:"
+                for order in self.game_header['rounds'][round_index]['round_order']:
+                    idx = order
+                    user_name = User.objects.get(id=idx).username
+                    new_order += f"{user_name}, "
+                user = User.objects.get(id=user_id)
+                tick_res = f"\ntick {tick_index} won by {user.username} {new_order}"
+            if flag_round_end:
+                res = self.score_round(round_index)
 
-        if flag_round_end:
-            self.initialize_round()
+            if flag_round_end:
+                self.initialize_round()
 
-        if flag_tick_end:
-            self.initialize_tick()
+            if flag_tick_end:
+                self.initialize_tick()
 
-        self.initialize_play_tick()
-        if res == "":
-            res = "card"
-        return res
-        # except Exception as e:
-        #     print(e, "Failed to pay player card in GameRoom Model")
-        #     return ""
+            self.initialize_play_tick()
+            if res == "":
+                res = "card"
+            return res, tick_res
+        except Exception as e:
+            print(e, "Failed to pay player card in GameRoom Model")
+            return "", ""
 
 
 class Player(models.Model):

@@ -278,17 +278,17 @@ class GameRoomManager(models.Manager):
                     })
 
             elif message_type == 'TICK':
-                res = room.play_player_card(message)
+                res, tick_res = room.play_player_card(message)
                 if res != "":
                     if res == "A":
                         self.send_message_to_all_players(
-                            game_room_id, {'type': 'game_status', 'game_status': 'Team A won the game'})
+                            game_room_id, {'type': 'game_status', 'game_status': f'{tick_res}Team A won the game'})
                     elif res == "B":
                         self.send_message_to_all_players(
-                            game_room_id, {'type': 'game_status', 'game_status': 'Team B won the game'})
+                            game_room_id, {'type': 'game_status', 'game_status': f'{tick_res} Team B won the game'})
                     elif res == "card":
                         self.send_message_to_all_players(
-                            game_room_id, {'type': 'game_status', 'game_status': f'Card played successfully by player {username}'})
+                            game_room_id, {'type': 'game_status', 'game_status': f'{message} Card played successfully by player {username}, {tick_res}'})
             else:
                 # Handle unknown message types
                 print(f"Unknown message type: {message_type}")
