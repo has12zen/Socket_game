@@ -3,12 +3,19 @@ from django.db import models
 from .card import Card
 from pathlib import Path
 import random
+import secrets
 from .gameRoomManager import GameRoomManager, generate_room_id
 from ChatApp.constants import PLAYER_COUNT
 from django.utils import timezone
 
 
 # Create your models here.
+
+def truly_random_shuffle(lst):
+    for i in reversed(range(1, len(lst))):
+        j = secrets.randbelow(i + 1)
+        lst[i], lst[j] = lst[j], lst[i]
+
 
 class User(models.Model):
     username = models.CharField(max_length=255, unique=True)
@@ -67,7 +74,7 @@ class GameRoom(models.Model):
         try:
             current_round_index = self.game_header["current_round_index"]
             deck = [Card(i) for i in range(52)]
-            random.shuffle(deck)
+            truly_random_shuffle(deck)
             for i, player in enumerate(self.game_header['game_order']):
                 hand = [c.to_dict() for c in deck[(i*13):((i+1) * 13)]]
                 hand.sort(key=(lambda k: k['id']))
@@ -136,7 +143,8 @@ class GameRoom(models.Model):
             if game_action == "BID_TYPE" or game_action == 'BID_AMOUNT':
                 selectable = self.get_playable_cards(user_id, True)
             else:
-                selectable = self.get_playable_cards(user_id)
+                selectable = self.get_playable_cards(user_id, False)
+            print(selectable, user_id, "send_player_hand")
             deck = [Card(i) for i in selectable]
             cards = [c.to_dict() for c in deck]
             return cards
@@ -191,10 +199,7 @@ class GameRoom(models.Model):
             round_index = self.game_header["current_round_index"]
             player_id = str(player_id)
 
-            print(player_id, game_player_dict, player_id in game_player_dict)
-
             team = game_player_dict[player_id]
-            print(player_id, game_player_dict, player_id in game_player_dict)
             team_index = ord(team[0]) - ord('A')
             number = int(team[1])-1
             self.game_header['game_history'].append(
@@ -219,6 +224,10 @@ class GameRoom(models.Model):
             team_index = ord(team[0]) - ord('A')
             number = int(team[1])-1
             self.game_header['rounds'][round_index]['round_contract'][team_index]['bids'][number] = amount
+            a1 = self.game_header['rounds'][round_index]['round_contract'][team_index]['bids'][0]
+            a2 = self.game_header['rounds'][round_index]['round_contract'][team_index]['bids'][1]
+            self.game_header['rounds'][round_index]['round_contract'][team_index]['sum'] = int(
+                a1)+int(a2)
             self.game_action = "BID_TYPE"
             self.round_player_index += 1
             self.game_header['game_history'].append(
@@ -236,7 +245,8 @@ class GameRoom(models.Model):
         round_index = self.game_header["current_round_index"]
         player_id = self.get_round_player_id()
         player_id = str(player_id)
-        for index, card in enumerate(self.game_header['rounds'][round_index]['round_hands'][player_id]):
+        cards = self.game_header['rounds'][round_index]['round_hands'][player_id]
+        for index, card in enumerate(cards):
             print(card['id'], card_id)
             if card['id'] == card_id:
                 return card_id, index
@@ -265,14 +275,14 @@ class GameRoom(models.Model):
             elif (lead_suite == card['suiteID']):
                 # Otherwise, try to match the lead suite
                 selectable.append(card['id'])
-
         if (len(selectable) == 0):
             # If nothing was playable, all cards are fair game!
             selectable = [card['id'] for card in cards]
         else:
             for i, card in enumerate(cards):
                 if (card['suiteID'] == 3 and spade_in_play):
-                    selectable.append(i)
+                    if card['id'] not in selectable:
+                        selectable.append(card['id'])
 
         return selectable
 
@@ -332,25 +342,25 @@ class GameRoom(models.Model):
             bags = 0
             wins = [win1, win2]
 
-            overflow = (win1 + win2) - contract.sum
-            for i, bid in enumerate(contract.bids):
+            overflow = (win1 + win2) - contract['sum']
+            for i, bid in enumerate(contract['bids']):
                 # Nil case
                 if (bid == 0):
                     if (overflow > 0 or (wins[i] != 0)):
                         # Lost nil
                         score -= 100
-                        if (contract.blinds[i]):
+                        if (contract['blinds'][i]):
                             # Lost nil AND blind
                             score -= 100
                     else:
                         # Met nil
                         score += 100
-                        if (contract.blinds[i]):
+                        if (contract['blinds'][i]):
                             # Met nil AND blind
                             score += 100
                 # General win case
                 elif (overflow >= 0):
-                    if (contract.blinds[i]):
+                    if (contract['blinds'][i]):
                         # Blinds are PERSONAL!
                         if (wins[i] - bid < 0):
                             score -= 100
@@ -361,27 +371,29 @@ class GameRoom(models.Model):
                         score += bid * 10
                 else:
                     # Doc as many points as is appropriate
-                    if (contract.blinds[i]):
+                    if (contract['blinds'][i]):
                         score -= 100
                     else:
                         score -= bid * 10
 
             # Handle Bags
             if (overflow > 0):
-                for i, bid in enumerate(contract.bids):
+                for i, bid in enumerate(contract['bids']):
                     diff = wins[i] - bid
                     if (diff > 0):
                         # One bag/point per extra hand
                         score += diff
                         # Blinds don't get bags
-                        if (not contract.blinds[i]):
+                        if (not contract['blinds'][i]):
                             bags += diff
             return score, bags
         except Exception as e:
+            print(e, "scoring Contract failed")
             return False, False
 
     def score_round(self, round_index):
         try:
+            print("Scoring round", round_index)
             scoreA, bagsA = self.score_contract(round_index, 0)
             scoreB, bagsB = self.score_contract(round_index, 1)
             if (scoreA == False or scoreB == False):
@@ -404,11 +416,22 @@ class GameRoom(models.Model):
                 self.game_header["game_order"].pop(0))
             # check game winner
             res = ""
-            if self.game_header['game_score'][0] >= self.game_header['winning_value'] or self.game_header['game_score'][1] >= self.game_header['winning_value']:
+            win_value = self.game_header['winning_value']
+            if self.game_header['game_score'][0] >= win_value or self.game_header['game_score'][1] >= win_value:
                 if self.game_header['game_score'][0] > self.game_header['game_score'][1]:
                     res = "A"
                 elif self.game_header['game_score'][0] < self.game_header['game_score'][1]:
                     res = "B"
+                else:
+                    if self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] < self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                        res = "A"
+                    elif self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] > self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
+                        res = "B"
+            elif self.game_header['game_score'][0] <= -win_value or self.game_header['game_score'][1] <= -win_value:
+                if self.game_header['game_score'][0] < self.game_header['game_score'][1]:
+                    res = "B"
+                elif self.game_header['game_score'][0] > self.game_header['game_score'][1]:
+                    res = "A"
                 else:
                     if self.game_header['game_bags'][0]+self.game_header['game_discarded_bags'][0] < self.game_header['game_bags'][1]+self.game_header['game_discarded_bags'][1]:
                         res = "A"
@@ -427,18 +450,19 @@ class GameRoom(models.Model):
                     player_4 = self.get_player_from_team('A2')
                 self.game_header['game_history'].append(
                     f"{player_1} {player_2} win the game\n {player_3} {player_4} loose the game")
+                self.status = 'COMPLETED'
                 u1 = User.objects.get(id=player_1)
                 u2 = User.objects.get(id=player_2)
                 u3 = User.objects.get(id=player_3)
                 u4 = User.objects.get(id=player_4)
                 GameStats.objects.create(
-                    user=u1, game_room=self, win=True, room_id=self.room_id)
+                    user=u1, game_room=self, winOrLose=True, room_id=self.room_id)
                 GameStats.objects.create(
-                    user=u2, game_room=self, win=True, room_id=self.room_id)
+                    user=u2, game_room=self, winOrLose=True, room_id=self.room_id)
                 GameStats.objects.create(
-                    user=u3, game_room=self, win=False, room_id=self.room_id)
+                    user=u3, game_room=self, winOrLose=False, room_id=self.room_id)
                 GameStats.objects.create(
-                    user=u4, game_room=self, win=False, room_id=self.room_id)
+                    user=u4, game_room=self, winOrLose=False, room_id=self.room_id)
             self.save()
             return res
         except Exception as e:
@@ -446,15 +470,16 @@ class GameRoom(models.Model):
 
     def play_player_card(self, message):
         try:
+            print(message)
             card_id = int(message)
             card_ide, card_index = self.get_card_index(card_id)
             player_id = self.get_round_player_id()
             selectable = self.get_playable_cards(player_id)
+            round_index = self.game_header["current_round_index"]
             round_player_index = self.round_player_index
             if card_ide not in selectable:
                 raise Exception("Card not playable")
             player_id = str(player_id)
-            round_index = self.game_header["current_round_index"]
             card = self.game_header['rounds'][round_index]['round_hands'][player_id][card_index]
             self.game_header['rounds'][self.game_header["current_round_index"]
                                        ]['round_hands'][player_id][card_index]['card_played'] = True
@@ -493,7 +518,14 @@ class GameRoom(models.Model):
                 user_id = ret_obj['tick_winner']
                 user_id = int(user_id)
                 new_order = "\nNew order:"
-                for order in self.game_header['rounds'][round_index]['round_order']:
+                round_order = self.game_header['rounds'][round_index]['round_order']
+                if tick_index == 12:
+                    round_order = []
+                    for ordr in self.game_header['game_order']:
+                        round_order.append(ordr)
+                    round_order.append(round_order.pop(0))
+                    # rotate order
+                for order in round_order:
                     idx = order
                     user_name = User.objects.get(id=idx).username
                     new_order += f"{user_name}, "
@@ -504,6 +536,7 @@ class GameRoom(models.Model):
 
             if flag_round_end:
                 self.initialize_round()
+                self.deal_round_hands()
 
             if flag_tick_end:
                 self.initialize_tick()
@@ -531,4 +564,4 @@ class GameStats(models.Model):
     game_room = models.ForeignKey(GameRoom, on_delete=models.CASCADE)
     winOrLose = models.BooleanField(default=False)
     room_id = models.CharField(
-        max_length=6, unique=True, default="")
+        max_length=6, unique=False, default="")

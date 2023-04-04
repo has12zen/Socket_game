@@ -323,6 +323,21 @@
               const card_num = hands[i];
               selectable.push(card_num.id);
             }
+            const message_type = document.getElementById("message_type").value;
+            const message_select = document.getElementById("message");
+            if (message_type=='TICK'){
+              message_select.innerHTML = "";
+              const option = document.createElement("option");
+              option.text = "Select a card";
+              option.value = "";
+              message_select.add(option);
+              for (let i = 0; i < selectable.length; i++) {
+                const option = document.createElement("option");
+                option.text = selectable[i].toString();
+                option.value = selectable[i].toString();
+                message_select.add(option);
+              }
+            }
           }
         };
 
